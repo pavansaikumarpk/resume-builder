@@ -1,0 +1,14 @@
+{
+    "name": "gemini-test",
+    "version": "1.0.0",
+    "description": "A clean test for Gemini API",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+      "start": "node index.js"
+    },
+    "dependencies": {
+      "@google/generative-ai": "^0.24.1",
+      "dotenv": "^16.4.5"
+    }
+  }

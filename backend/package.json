@@ -15,9 +15,10 @@
   },
   "dependencies": {
     "@babel/cli": "^7.24.7",
-    "@babel/core": "^7.24.7",
+    "@babel/core": "^7.29.0",
     "@babel/preset-env": "^7.24.7",
-    "@babel/preset-react": "^7.24.7",
+    "@babel/preset-react": "^7.28.5",
+    "@babel/register": "^7.29.3",
     "@react-pdf/renderer": "^3.4.4",
     "bcryptjs": "^2.4.3",
     "compression": "^1.8.1",

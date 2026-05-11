@@ -149,7 +149,7 @@
 
 
 const Resume = require('../models/resumeModel.js');
-const { generatePdf } = require('../utils/pdfTemplate.js');
+const { generatePdf } = require('../utils/pdfTemplate.jsx');
 const crypto = require('crypto'); // Built-in Node.js module for security
 
 // --- 1. GROWTH FEATURE: Get Public Resume ---

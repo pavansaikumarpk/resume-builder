@@ -7,7 +7,9 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit'); 
 const morgan = require('morgan'); 
 const importRoutes = require('./routes/import-routes');
-
+require('@babel/register')({
+  presets: ['@babel/preset-react']
+});
 
 dotenv.config();
 

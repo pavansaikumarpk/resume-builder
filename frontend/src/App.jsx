@@ -1,9 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './landing/LandingPage';
 import LoginPage from './auth/LoginPage';
 import SignupPage from './auth/SignupPage';
-import DashboardPage from './dashboard/DashboardPage'; // <-- FIXED: Removed {}
-import WorkspacePage from './editor/WorkspacePage';   // <-- FIXED: Removed {}
+import DashboardPage from './dashboard/DashboardPage';
+import WorkspacePage from './editor/WorkspacePage';
 import PublicPortfolioPage from './portfolio/PublicPortfolioPage';
 import TemplatesPage from './templates/TemplatesPage';
 
@@ -14,7 +14,7 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
@@ -29,6 +29,6 @@ export default function App() {
         
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }

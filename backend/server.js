@@ -28,7 +28,10 @@ connectDB();
 
 app.use(compression());
 
-app.use(helmet());
+// 🚀 FIX: Configure Helmet to allow cross-origin popups (Required for Google Auth!)
+app.use(helmet({
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }
+}));
 
 app.use(morgan('dev'));
 
@@ -40,19 +43,15 @@ const globalLimiter = rateLimit({
 
 app.use('/api/', globalLimiter);
 
+// 🚀 FIX: Array-based origins. 
+// If an origin doesn't match, it gracefully rejects it instead of throwing a fatal 500 crash error.
 const allowedOrigins = [
   'http://localhost:3000',
   process.env.FRONTEND_URL
 ];
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: allowedOrigins, // 🚀 Changed from a function to a direct array
   credentials: true,
   optionsSuccessStatus: 200
 };

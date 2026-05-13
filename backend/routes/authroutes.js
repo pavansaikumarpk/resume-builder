@@ -1,10 +1,10 @@
 const express = require('express');
-const authRouter = express.Router();
-const { registerUser, loginUser } = require('../controllers/authcontroller');
+const { registerUser, authUser, googleAuth } = require('../controllers/authcontroller'); // 🚀 Import it
 
+const router = express.Router();
 
-authRouter.post('/signup', registerUser);
+router.post('/signup', registerUser);
+router.post('/login', authUser);
+router.post('/google', googleAuth); // 🚀 Add the new route
 
-authRouter.post('/login', loginUser);
-
-module.exports = authRouter;
+module.exports = router;

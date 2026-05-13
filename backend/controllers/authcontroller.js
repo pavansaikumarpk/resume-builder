@@ -1,6 +1,7 @@
 const User = require('../models/usermodel');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const { OAuth2Client } = require('google-auth-library');
 
 // @desc    Register new user
 // @route   POST /api/auth/signup
@@ -18,13 +19,13 @@ const registerUser = async (req, res) => {
             return res.status(400).json({ message: 'User already exists' });
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
+        // 🚀 CRITICAL FIX: Pass the PLAIN password to User.create. 
+        // Do NOT hash it here, because your User Model's pre('save') hook will do it automatically. 
+        // Doing it twice breaks the login!
         const user = await User.create({
             username,
             email,
-            password: hashedPassword,
+            password: password, 
         });
 
         if (user) {
@@ -36,10 +37,9 @@ const registerUser = async (req, res) => {
                 httpOnly: true,
                 secure: process.env.NODE_ENV !== 'development',
                 sameSite: 'strict',
-                maxAge: 30 * 24 * 60 * 60 * 1000,
+                maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
             });
 
-            // FIXED: Added 'token' to the JSON response so the frontend can save it
             res.status(201).json({
                 _id: user._id,
                 username: user.username,
@@ -82,7 +82,6 @@ const loginUser = async (req, res) => {
                 maxAge: 30 * 24 * 60 * 60 * 1000,
             });
 
-            // FIXED: Added 'token' to the JSON response here too
             res.status(200).json({
                 _id: user._id,
                 username: user.username,
@@ -98,7 +97,57 @@ const loginUser = async (req, res) => {
     }
 };
 
+// @desc    Authenticate via Google
+// @route   POST /api/auth/google
+// @access  Public
+const googleAuth = async (req, res) => {
+    try {
+        const { token } = req.body;
+        // Verify the Google token
+        const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        
+        const { email, name } = ticket.getPayload();
+
+        // Check if user exists, otherwise create them automatically
+        let user = await User.findOne({ email });
+        
+        if (!user) {
+            user = await User.create({ username: name, email });
+        }
+
+        // 🚀 CRITICAL FIX: Replaced undefined `generateToken` with actual JWT signing and cookie logic
+        const jwtToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+            expiresIn: '30d',
+        });
+
+        res.cookie('jwt', jwtToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV !== 'development',
+            sameSite: 'strict',
+            maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
+
+        res.status(200).json({
+            _id: user._id,
+            username: user.username,
+            email: user.email,
+            token: jwtToken,
+        });
+    } catch (error) {
+        console.error("Google Auth Error:", error);
+        res.status(401).json({ message: 'Google Authentication failed. Please try again.' });
+    }
+};
+
+// 🚀 CRITICAL FIX: Added googleAuth to the exports, and aliased loginUser to authUser
+// just in case your route file is looking for 'authUser' instead of 'loginUser'.
 module.exports = {
     registerUser,
     loginUser,
+    authUser: loginUser, 
+    googleAuth
 };

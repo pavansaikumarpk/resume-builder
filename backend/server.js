@@ -28,9 +28,10 @@ connectDB();
 
 app.use(compression());
 
-// 🚀 FIX: Configure Helmet to allow cross-origin popups (Required for Google Auth!)
+
 app.use(helmet({
-  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+  crossOriginResourcePolicy: { policy: "cross-origin" } // <--- ADD THIS LINE
 }));
 
 app.use(morgan('dev'));

@@ -1,17 +1,10 @@
 import axios from 'axios';
 
-// const api = axios.create({
-//   baseURL: 'http://localhost:8000/api',
-//   headers: { 'Content-Type': 'application/json' }
-// });
-
-import axios from 'axios';
-
 const api = axios.create({
   // 🚀 If VITE_API_URL fails, it falls back directly to your Render backend
   baseURL: import.meta.env.VITE_API_URL || 'https://resume-builder-t50m.onrender.com/api',
   headers: { 'Content-Type': 'application/json' },
-  withCredentials: true, // 🚀 CRITICAL: Required for cookies to work across different domains!
+  withCredentials: true, // Required for secure cookies to work across domains
 });
 
 api.interceptors.request.use((config) => {
@@ -30,7 +23,7 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       console.warn("Session expired. Logging out.");
       localStorage.removeItem('token');
-      localStorage.removeItem('userInfo'); // 🚀 Make sure we clear the user data too!
+      localStorage.removeItem('userInfo');
       window.location.href = '/login'; 
     }
     return Promise.reject(error);

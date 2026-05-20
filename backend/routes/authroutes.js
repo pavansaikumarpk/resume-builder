@@ -1,10 +1,12 @@
 const express = require('express');
-const { registerUser, authUser, googleAuth } = require('../controllers/authcontroller'); // 🚀 Import it
+const authRouter = express.Router();
+const { registerUser, loginUser, googleAuth } = require('../controllers/authcontroller');
 
-const router = express.Router();
+// 100% YOUR ORIGINAL ROUTES
+authRouter.post('/register', registerUser);
+authRouter.post('/login', loginUser);
 
-router.post('/signup', registerUser);
-router.post('/login', authUser);
-router.post('/google', googleAuth); // 🚀 Add the new route
+// 🚀 ADDED GOOGLE ROUTE
+authRouter.post('/google', googleAuth);
 
-module.exports = router;
+module.exports = authRouter;

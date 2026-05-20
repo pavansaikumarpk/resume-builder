@@ -1,73 +1,3 @@
-// import { create } from 'zustand';
-// import api from '../utils/api';
-
-// export const useAuthStore = create((set) => ({
-//   user: null,
-//   token: localStorage.getItem('token') || null,
-//   isLoading: false,
-//   error: null,
-
-//   signup: async (userData) => {
-//     set({ isLoading: true, error: null });
-//     try {
-//       const response = await api.post('/auth/signup', userData);
-      
-//       // FIXED: Extract the token from the backend response
-//       const { token, ...user } = response.data;
-      
-//       // FIXED: Save the real token into Local Storage
-//       if (token) {
-//           localStorage.setItem('token', token);
-//       }
-      
-//       set({ user, token, isLoading: false });
-//       return true;
-//     } catch (error) {
-//       set({ 
-//         error: error.response?.data?.message || 'Signup failed', 
-//         isLoading: false 
-//       });
-//       return false;
-//     }
-//   },
-
-//   login: async (userData) => {
-//     set({ isLoading: true, error: null });
-//     try {
-//       const response = await api.post('/auth/login', userData);
-      
-//       // FIXED: Extract the token from the backend response
-//       const { token, ...user } = response.data;
-      
-//       // FIXED: Save the real token into Local Storage
-//       if (token) {
-//           localStorage.setItem('token', token);
-//       }
-      
-//       set({ user, token, isLoading: false });
-//       return true;
-//     } catch (error) {
-//       set({ 
-//         error: error.response?.data?.message || 'Login failed', 
-//         isLoading: false 
-//       });
-//       return false;
-//     }
-//   },
-
-//   logout: () => {
-//     localStorage.removeItem('token');
-//     set({ user: null, token: null });
-//     window.location.href = '/login';
-//   }
-// }));
-
-
-
-
-
-
-
 import { create } from 'zustand';
 import api from '../utils/api';
 
@@ -79,7 +9,11 @@ export const useAuthStore = create((set) => ({
     set({ isLoading: true });
     try {
       const { data } = await api.post('/auth/login', { email, password });
+      
+      // 🚀 CRITICAL FIX: Save BOTH userInfo and token
       localStorage.setItem('userInfo', JSON.stringify(data));
+      if (data.token) localStorage.setItem('token', data.token);
+      
       set({ user: data, isLoading: false });
       return { success: true };
     } catch (error) {
@@ -92,7 +26,11 @@ export const useAuthStore = create((set) => ({
     set({ isLoading: true });
     try {
       const { data } = await api.post('/auth/signup', { username, email, password });
+      
+      // 🚀 CRITICAL FIX: Save BOTH userInfo and token
       localStorage.setItem('userInfo', JSON.stringify(data));
+      if (data.token) localStorage.setItem('token', data.token);
+      
       set({ user: data, isLoading: false });
       return { success: true };
     } catch (error) {
@@ -101,12 +39,15 @@ export const useAuthStore = create((set) => ({
     }
   },
 
-  // 🚀 NEW: Handle Google Login
   googleAuth: async (token) => {
     set({ isLoading: true });
     try {
       const { data } = await api.post('/auth/google', { token });
+      
+      // 🚀 CRITICAL FIX: Save BOTH userInfo and token
       localStorage.setItem('userInfo', JSON.stringify(data));
+      if (data.token) localStorage.setItem('token', data.token);
+      
       set({ user: data, isLoading: false });
       return { success: true };
     } catch (error) {
@@ -116,7 +57,10 @@ export const useAuthStore = create((set) => ({
   },
 
   logout: () => {
+    // 🚀 CRITICAL FIX: Clear BOTH when logging out
     localStorage.removeItem('userInfo');
+    localStorage.removeItem('token');
     set({ user: null });
+    window.location.href = '/login';
   },
 }));

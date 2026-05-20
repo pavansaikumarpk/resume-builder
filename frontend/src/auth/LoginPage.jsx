@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { Mail, Lock, Loader2, FileText, AlertCircle } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
@@ -8,27 +8,23 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  
-  // UX state for Render Cold Starts
   const [isWakingServer, setIsWakingServer] = useState(false);
   
   const { login, googleAuth, isLoading } = useAuthStore();
-  const navigate = useNavigate();
 
   const handleAction = async (actionFunction) => {
     setError('');
     setIsWakingServer(false);
     
-    // Start a timer: If it takes >3 seconds, tell the user the server is waking up
     const timer = setTimeout(() => setIsWakingServer(true), 3000);
-    
     const result = await actionFunction();
     
     clearTimeout(timer);
     setIsWakingServer(false);
 
     if (result.success) {
-      navigate('/dashboard');
+      // 🚀 CRITICAL FIX: Hard redirect to clear React Router cache
+      window.location.href = '/dashboard';
     } else {
       setError(result.message);
     }
@@ -44,14 +40,10 @@ export default function LoginPage() {
   };
 
   return (
-    /* 🚀 CRITICAL FIX: The outer div now forces the box to be perfectly centered on the screen */
     <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
-        
-      {/* Decorative background elements for a premium feel */}
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
 
-      {/* Premium Card Container */}
       <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl shadow-indigo-100/50 w-full max-w-md relative z-10 border border-slate-100">
         
         <div className="text-center mb-8">
@@ -68,7 +60,6 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Render Cold Start Warning UI */}
         {isWakingServer && (
           <div className="mb-6 p-4 bg-amber-50 text-amber-700 rounded-xl text-sm font-bold flex items-start gap-3 border border-amber-200 animate-pulse">
             <Loader2 size={18} className="animate-spin mt-0.5 shrink-0" /> 
@@ -76,7 +67,6 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Google Login Button */}
         <div className="mb-6 flex justify-center">
            <GoogleLogin
               onSuccess={handleGoogleSuccess}

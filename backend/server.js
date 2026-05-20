@@ -21,27 +21,25 @@ const aiRoutes = require('./routes/ai-routes');
 
 const app = express();
 
-// Required for Render and secure cookies
+// Required for Render and secure cookies behind proxies
 app.set('trust proxy', 1); 
 connectDB();
 
 // ====================================================================
-// 🚀 THE NUCLEAR CORS FIX (Bypasses all array mismatch issues)
+// CORS CONFIGURATION
 // ====================================================================
 app.use(cors({
   origin: function (origin, callback) {
-    // This instantly approves ANY origin that asks, completely eliminating the 
-    // "Access-Control-Allow-Origin" mismatch error forever.
+    // Allows any origin (Solves the Vercel/Render mismatch)
     callback(null, true);
   },
-  credentials: true, // Forces the VIP cookie badge to always be 'true'
+  credentials: true, // Forces the cookie to be sent
   optionsSuccessStatus: 200
 }));
 
 // ====================================================================
 // MIDDLEWARES
 // ====================================================================
-// Allow popups for Google Auth, but allow Vercel to read the data
 app.use(helmet({
   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
   crossOriginResourcePolicy: { policy: "cross-origin" }
@@ -51,7 +49,7 @@ app.use(compression());
 app.use(morgan('dev'));
 
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
   message: 'Too many requests from this IP, please try again after 15 minutes'
 });
@@ -73,9 +71,9 @@ app.get('/', (req, res) => {
   res.send('Resumn API is running successfully...');
 });
 
-// If an error occurs, this ensures CORS headers aren't stripped from the error response
+// Ensures CORS headers aren't stripped from error responses
 app.use((err, req, res, next) => {
-    res.header("Access-Control-Allow-Origin", req.headers.origin);
+    res.header("Access-Control-Allow-Origin", req.headers.origin || '*');
     res.header("Access-Control-Allow-Credentials", "true");
     next(err);
 });

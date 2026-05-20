@@ -30,10 +30,9 @@ connectDB();
 // ====================================================================
 app.use(cors({
   origin: function (origin, callback) {
-    // Allows any origin (Solves the Vercel/Render mismatch)
     callback(null, true);
   },
-  credentials: true, // Forces the cookie to be sent
+  credentials: true, 
   optionsSuccessStatus: 200
 }));
 
@@ -49,7 +48,7 @@ app.use(compression());
 app.use(morgan('dev'));
 
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 100,
   message: 'Too many requests from this IP, please try again after 15 minutes'
 });
@@ -62,6 +61,12 @@ app.use(cookieParser());
 // ====================================================================
 // ROUTES
 // ====================================================================
+
+// 🚀 THE SANITY CHECK ROUTE
+app.get('/api/test', (req, res) => {
+  res.send("NEW CODE IS LIVE!");
+});
+
 app.use('/api/auth', authRouter);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/ai', aiRoutes);
@@ -71,7 +76,6 @@ app.get('/', (req, res) => {
   res.send('Resumn API is running successfully...');
 });
 
-// Ensures CORS headers aren't stripped from error responses
 app.use((err, req, res, next) => {
     res.header("Access-Control-Allow-Origin", req.headers.origin || '*');
     res.header("Access-Control-Allow-Credentials", "true");

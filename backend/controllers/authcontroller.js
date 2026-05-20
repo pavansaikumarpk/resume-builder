@@ -17,14 +17,12 @@ const registerUser = async (req, res) => {
             return res.status(400).json({ message: 'User already exists' });
         }
 
-        // Explicitly hash the password here to guarantee it is secure
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
+        // 🚀 MY MISTAKE CORRECTED: Passing the raw password. 
+        // Your usermodel.js pre('save') hook will hash this securely.
         const user = await User.create({
             username,
             email,
-            password: hashedPassword, 
+            password: password, 
         });
 
         if (user) {
@@ -62,27 +60,11 @@ const loginUser = async (req, res) => {
             return res.status(401).json({ message: 'User not found. Please sign up.' });
         }
 
-        let isMatch = false;
-
-        // 🚀 THE FIX: Detect if the database has a plain text password
-        if (user.password && !user.password.startsWith('$2')) {
-            console.warn(`Plaintext password detected for user: ${email}`);
-            isMatch = (password === user.password);
-            
-            // Auto-upgrade the user's password to a hash for the future
-            if (isMatch) {
-                const salt = await bcrypt.genSalt(10);
-                user.password = await bcrypt.hash(password, salt);
-                await user.save();
-                console.log("Successfully upgraded user password to bcrypt hash.");
-            }
-        } else if (user.password) {
-            // Standard secure login
-            isMatch = await bcrypt.compare(password, user.password);
-        }
+        // Standard secure login
+        const isMatch = await bcrypt.compare(password, user.password);
 
         if (!isMatch) {
-            return res.status(401).json({ message: 'Incorrect password.' });
+            return res.status(401).json({ message: 'Incorrect email or password.' });
         }
 
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
@@ -112,23 +94,29 @@ const googleAuth = async (req, res) => {
     try {
         const { token } = req.body;
         
-        // 🚀 THE FIX: Catch missing Environment Variables instantly
         if (!process.env.GOOGLE_CLIENT_ID) {
             console.error("SERVER ERROR: GOOGLE_CLIENT_ID is missing from Render environment.");
-            return res.status(500).json({ message: 'Server configuration error. Contact support.' });
+            return res.status(500).json({ message: 'Server configuration error.' });
         }
 
         const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+        
+        // 🚀 WE LOG THIS TO SEE IF VERIFICATION FAILS
+        console.log("Attempting to verify Google Token for Audience:", process.env.GOOGLE_CLIENT_ID);
+
         const ticket = await client.verifyIdToken({
             idToken: token,
             audience: process.env.GOOGLE_CLIENT_ID,
         });
         
         const { email, name } = ticket.getPayload();
+        console.log(`Google Token verified successfully for: ${email}`);
 
         let user = await User.findOne({ email });
         if (!user) {
-            user = await User.create({ username: name, email });
+            // For Google Auth, we create a random strong password since they don't use one
+            const randomPassword = Math.random().toString(36).slice(-10) + "A1!";
+            user = await User.create({ username: name, email, password: randomPassword });
         }
 
         const jwtToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
@@ -147,8 +135,8 @@ const googleAuth = async (req, res) => {
             token: jwtToken,
         });
     } catch (error) {
-        // 🚀 THE FIX: Return the EXACT Google error to the Network tab
-        console.error("Google Auth Error:", error.message);
+        // 🚀 THIS WILL TELL US EXACTLY WHY GOOGLE FAILED IN THE RENDER LOGS
+        console.error("GOOGLE AUTH FATAL ERROR:", error.message);
         res.status(401).json({ message: 'Google Authentication failed.', error: error.message });
     }
 };

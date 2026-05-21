@@ -1,16 +1,12 @@
 
 
 
-
 // import React, { useState, useEffect, useRef } from 'react';
 // import { useParams, useNavigate } from 'react-router-dom';
 // import { useResumeStore } from '../store/useResumeStore';
-
-// // 👇 FIX: Notice the curly braces around these imports!
 // import { EditorPanel } from './EditorPanel';
 // import { PreviewPanel } from './PreviewPanel';
 // import { AnalysisPanel } from './AnalysisPanel';
-
 // import { Loader2, ArrowLeft, Cloud, Sparkles } from 'lucide-react';
 // import styles from './workspace.module.css';
 
@@ -19,12 +15,12 @@
 //   const navigate = useNavigate();
 //   const { fetchActiveResume, isLoading, activeResume, isSaving } = useResumeStore();
 
-//   // THE MONETIZATION TOGGLE STATE (Default OFF)
 //   const [isAiMode, setIsAiMode] = useState(false);
 
-//   // DRAG HANDLE STATES
+//   // 🚀 CRITICAL FIX: Default to 45% of the screen width for a perfect layout balance
+//   const initialRightWidth = window.innerWidth * 0.40;
 //   const [leftWidth, setLeftWidth] = useState(320); 
-//   const [rightWidth, setRightWidth] = useState(350); 
+//   const [rightWidth, setRightWidth] = useState(initialRightWidth); 
   
 //   const isDraggingLeft = useRef(false);
 //   const isDraggingRight = useRef(false);
@@ -43,7 +39,8 @@
 //       } else if (isDraggingRight.current) {
 //         let newWidth = window.innerWidth - e.clientX;
 //         if (newWidth < 300) newWidth = 300;
-//         if (newWidth > 800) newWidth = 800;
+//         // 🚀 Allow right panel to take up to 65% of the screen
+//         if (newWidth > window.innerWidth * 0.65) newWidth = window.innerWidth * 0.65; 
 //         setRightWidth(newWidth);
 //       }
 //     };
@@ -70,7 +67,6 @@
 //   return (
 //     <div className="h-screen w-screen bg-slate-100 flex flex-col overflow-hidden font-sans">
       
-//       {/* App Header */}
 //       <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-20 shrink-0">
 //         <div className="flex items-center gap-3">
 //           <button onClick={() => navigate('/dashboard')} className="p-1.5 hover:bg-slate-100 rounded-md text-slate-500 transition-colors">
@@ -87,7 +83,6 @@
 //           )}
 //         </div>
 
-//         {/* --- PRO AI TOGGLE UI --- */}
 //         <div className="flex items-center gap-3 bg-slate-800 px-4 py-1.5 rounded-full border border-slate-700 shadow-inner">
 //           <Sparkles size={14} className={isAiMode ? "text-indigo-400" : "text-slate-500"} />
 //           <span className={`text-xs font-bold tracking-wider uppercase transition-colors ${isAiMode ? "text-white" : "text-slate-400"}`}>
@@ -101,17 +96,14 @@
 //         </div>
 //       </header>
 
-//       {/* 3-Pane Layout with Drag Handles */}
 //       <div className="flex-1 flex overflow-hidden">
         
-//         {/* CONDITIONALLY RENDER LEFT PANEL: AI Co-Pilot */}
 //         {isAiMode && (
 //           <>
 //             <div style={{ width: leftWidth }} className="bg-white flex flex-col z-10 shrink-0 border-r border-slate-200 shadow-xl">
 //               <AnalysisPanel />
 //             </div>
 
-//             {/* LEFT DRAG HANDLE */}
 //             <div 
 //               className="w-1.5 bg-slate-200 hover:bg-indigo-500 cursor-col-resize z-20 transition-colors"
 //               onMouseDown={() => { 
@@ -123,12 +115,10 @@
 //           </>
 //         )}
 
-//         {/* CENTER: Editor Panel */}
 //         <div className="flex-1 flex flex-col bg-slate-50 overflow-y-auto relative shadow-inner min-w-[300px]">
 //           <EditorPanel />
 //         </div>
 
-//         {/* RIGHT DRAG HANDLE */}
 //         <div 
 //           className="w-1.5 bg-[#2d2d2d] hover:bg-indigo-500 cursor-col-resize z-20 transition-colors"
 //           onMouseDown={() => { 
@@ -138,7 +128,6 @@
 //           }}
 //         />
 
-//         {/* RIGHT: Live PDF Preview */}
 //         <div style={{ width: rightWidth }} className="bg-[#1e1e1e] flex flex-col z-10 relative shrink-0">
 //           <PreviewPanel />
 //         </div>
@@ -158,13 +147,15 @@
 
 
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useResumeStore } from '../store/useResumeStore';
 import { EditorPanel } from './EditorPanel';
 import { PreviewPanel } from './PreviewPanel';
 import { AnalysisPanel } from './AnalysisPanel';
-import { Loader2, ArrowLeft, Cloud, Sparkles } from 'lucide-react';
+// 🚀 FIXED: Imported ChevronsLeftRight for the drag handles
+import { Loader2, ArrowLeft, Cloud, Sparkles, ChevronsLeftRight } from 'lucide-react';
 import styles from './workspace.module.css';
 
 export default function WorkspacePage() {
@@ -174,7 +165,6 @@ export default function WorkspacePage() {
 
   const [isAiMode, setIsAiMode] = useState(false);
 
-  // 🚀 CRITICAL FIX: Default to 45% of the screen width for a perfect layout balance
   const initialRightWidth = window.innerWidth * 0.40;
   const [leftWidth, setLeftWidth] = useState(320); 
   const [rightWidth, setRightWidth] = useState(initialRightWidth); 
@@ -196,7 +186,6 @@ export default function WorkspacePage() {
       } else if (isDraggingRight.current) {
         let newWidth = window.innerWidth - e.clientX;
         if (newWidth < 300) newWidth = 300;
-        // 🚀 Allow right panel to take up to 65% of the screen
         if (newWidth > window.innerWidth * 0.65) newWidth = window.innerWidth * 0.65; 
         setRightWidth(newWidth);
       }
@@ -261,14 +250,19 @@ export default function WorkspacePage() {
               <AnalysisPanel />
             </div>
 
+            {/* 🚀 FIXED: Added Arrow Icon to Left Drag Handle */}
             <div 
-              className="w-1.5 bg-slate-200 hover:bg-indigo-500 cursor-col-resize z-20 transition-colors"
+              className="w-2 bg-slate-200 hover:bg-indigo-500 cursor-col-resize z-20 flex flex-col items-center justify-center transition-colors relative"
               onMouseDown={() => { 
                 isDraggingLeft.current = true; 
                 document.body.style.cursor = 'col-resize';
                 document.body.style.userSelect = 'none'; 
               }}
-            />
+            >
+              <div className="absolute bg-white border border-slate-300 rounded-full p-0.5 text-slate-500 shadow-sm flex items-center justify-center pointer-events-none">
+                <ChevronsLeftRight size={12} />
+              </div>
+            </div>
           </>
         )}
 
@@ -276,14 +270,19 @@ export default function WorkspacePage() {
           <EditorPanel />
         </div>
 
+        {/* 🚀 FIXED: Added Arrow Icon to Right Drag Handle */}
         <div 
-          className="w-1.5 bg-[#2d2d2d] hover:bg-indigo-500 cursor-col-resize z-20 transition-colors"
+          className="w-2 bg-[#2d2d2d] hover:bg-indigo-500 cursor-col-resize z-20 flex flex-col items-center justify-center transition-colors relative"
           onMouseDown={() => { 
             isDraggingRight.current = true; 
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
           }}
-        />
+        >
+           <div className="absolute bg-[#3c3c3c] border border-[#555] rounded-full p-0.5 text-slate-300 shadow-md flex items-center justify-center pointer-events-none">
+            <ChevronsLeftRight size={12} />
+          </div>
+        </div>
 
         <div style={{ width: rightWidth }} className="bg-[#1e1e1e] flex flex-col z-10 relative shrink-0">
           <PreviewPanel />

@@ -1,334 +1,628 @@
-
-
-
-
-
-
-
 // const React = require('react');
-// const { renderToStream, Page, Text, View, Document, StyleSheet } = require('@react-pdf/renderer');
+// const { renderToStream, Page, Text, View, Document, StyleSheet, Link } = require('@react-pdf/renderer');
 
-// // ==========================================
-// // HELPER: RENDER SKILLS
-// // ==========================================
-// const renderSkillText = (text) => {
-//     if (typeof text === 'string' && text.includes(':')) {
-//         const parts = text.split(':');
-//         return <Text><Text style={{ fontWeight: 'bold' }}>{parts[0]}:</Text>{parts.slice(1).join(':')}</Text>;
-//     }
-//     return <Text>{text}</Text>;
+// const safeUrl = (url) => {
+//     if (!url) return '';
+//     const trimmed = url.trim();
+//     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+//     return `https://${trimmed}`;
 // };
 
-// // ==========================================
-// // 1. HARVARD TEMPLATE (ATS SAFE)
-// // ==========================================
-// const harvardStyles = StyleSheet.create({
-//     page: { fontFamily: 'Times-Roman', fontSize: 11, padding: '1in', color: '#000', lineHeight: 1.3 },
-//     headerText: { textAlign: 'center', marginBottom: 16 },
-//     name: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
-//     contact: { fontSize: 10 },
-//     section: { marginBottom: 10 },
-//     sectionTitle: { fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', borderBottomWidth: 1, borderBottomColor: '#000', paddingBottom: 2, marginBottom: 8, marginTop: 16 },
-//     itemRow: { flexDirection: 'row', justifyContent: 'space-between' },
-//     bold: { fontWeight: 'bold' },
-//     italic: { fontStyle: 'italic' },
-//     bulletRow: { flexDirection: 'row', marginTop: 3 },
-//     bullet: { width: 15 },
-//     bulletText: { flex: 1 }
-// });
+// const formatDates = (start, end) => {
+//     if (start && end) return `${start} - ${end}`;
+//     return start || end || '';
+// };
 
-// const HarvardTemplate = ({ data }) => {
+// const getSkillString = (items) => {
+//     if (!items || !Array.isArray(items)) return '';
+//     return items.map(item => typeof item === 'string' ? item : item.name).filter(Boolean).join(', ');
+// };
+
+// const getStylesConfig = (docStyle) => {
+//     const isHelvetica = docStyle?.fontFamily !== 'Times-Roman';
+//     const baseSize = Number(docStyle?.fontSize) || 11;
+    
+//     const marginsMap = { compact: '0.4in', standard: '0.5in', spacious: '0.7in' };
+//     const lineSpacingMap = { tight: 1.15, standard: 1.3, loose: 1.5 };
+
+//     return {
+//         fonts: {
+//             regular: isHelvetica ? 'Helvetica' : 'Times-Roman',
+//             bold: isHelvetica ? 'Helvetica-Bold' : 'Times-Bold',
+//             italic: isHelvetica ? 'Helvetica-Oblique' : 'Times-Italic',
+//             size: baseSize,
+//             h1: baseSize * 2.2,    
+//             h2: baseSize * 1.25,   
+//             h3: baseSize * 1.05,   
+//             small: baseSize * 0.95  
+//         },
+//         layout: {
+//             padding: marginsMap[docStyle?.margins] || '0.5in',
+//             lineHeight: lineSpacingMap[docStyle?.lineSpacing] || 1.3
+//         }
+//     };
+// };
+
+// // 🚀 CTO FIX: Renders contact info as nested <Text> to guarantee native wrapping without overlap
+// const ContactRenderer = ({ personal, justify, fontSize }) => {
+//     const items = [];
+//     if (personal.phone) items.push({ type: 'text', val: personal.phone });
+//     if (personal.email) items.push({ type: 'text', val: personal.email });
+//     if (personal.linkedin) items.push({ type: 'link', val: personal.linkedin, label: personal.linkedinLabel || 'LinkedIn' });
+//     if (personal.github) items.push({ type: 'link', val: personal.github, label: personal.githubLabel || 'GitHub' });
+//     if (personal.location) items.push({ type: 'text', val: personal.location });
+    
+//     if (items.length === 0) return null;
+//     const alignVal = justify === 'center' ? 'center' : (justify === 'flex-start' ? 'left' : 'right');
+
+//     return (
+//         <View style={{ marginTop: 6, marginBottom: 12 }}>
+//             <Text style={{ fontSize, textAlign: alignVal, lineHeight: 1.4 }}>
+//                 {items.map((item, index) => (
+//                     <Text key={index}>
+//                         {item.type === 'link' ? (
+//                             <Link src={safeUrl(item.val)} style={{ color: '#000', textDecoration: 'none' }}>{item.label}</Link>
+//                         ) : (
+//                             <Text>{item.val}</Text>
+//                         )}
+//                         {index < items.length - 1 ? '   |   ' : ''}
+//                     </Text>
+//                 ))}
+//             </Text>
+//         </View>
+//     );
+// };
+
+// const HarvardTemplate = ({ data, config }) => {
+//     const styles = StyleSheet.create({
+//         page: { fontFamily: config.fonts.regular, fontSize: config.fonts.size, padding: config.layout.padding, color: '#000', lineHeight: config.layout.lineHeight },
+//         headerText: { textAlign: 'center', marginBottom: 10 },
+//         name: { fontFamily: config.fonts.bold, fontSize: config.fonts.h1, textTransform: 'uppercase', marginBottom: 2, lineHeight: 1 },
+//         sectionTitle: { fontFamily: config.fonts.bold, fontSize: config.fonts.h2, textTransform: 'uppercase', borderTopWidth: 1, borderTopColor: '#000', borderBottomWidth: 1, borderBottomColor: '#000', paddingVertical: 4, marginBottom: 8, marginTop: 16, textAlign: 'center' },
+//         row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 },
+//         bold: { fontFamily: config.fonts.bold, fontSize: config.fonts.h3 },
+//         italic: { fontFamily: config.fonts.italic },
+//         bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 3, paddingLeft: 8 },
+//         bullet: { width: 14, fontFamily: config.fonts.bold },
+//         bulletText: { flex: 1, textAlign: 'justify' },
+//         sectionBlock: { marginBottom: 10 }
+//     });
+
 //     const personal = data.personalInfo || data.personalDetails || {};
 //     const sections = data.sections || [];
 //     const fullName = personal.name || `${personal.firstName || ''} ${personal.lastName || ''}`.trim() || 'Your Name';
 
 //     return (
-//         <Document>
-//             <Page size="A4" style={harvardStyles.page}>
-//                 <View style={harvardStyles.headerText}>
-//                     <Text style={harvardStyles.name}>{fullName}</Text>
-//                     <Text style={harvardStyles.contact}>
-//                         {[personal.email, personal.phone, personal.location, personal.linkedin, personal.github].filter(Boolean).join('   ')}
-//                     </Text>
-//                 </View>
+//         <Page size="A4" style={styles.page}>
+//             <View style={styles.headerText}>
+//                 <Text style={styles.name}>{fullName}</Text>
+//                 <ContactRenderer personal={personal} justify="center" fontSize={config.fonts.small} />
+//             </View>
 
-//                 {sections.map((section, idx) => {
-//                     if (section.key === 'personalDetails') return null;
+//             {sections.map((section, idx) => {
+//                 if (section.key === 'personalDetails') return null;
 
-//                     if (section.key === 'summary' && data.summary) {
-//                         return (
-//                             <View key={idx} style={harvardStyles.section}>
-//                                 <Text style={harvardStyles.sectionTitle}>{section.title}</Text>
-//                                 <Text>{data.summary}</Text>
+//                 if (section.key === 'summary' && data.summary) return (
+//                     <View key={idx} style={styles.sectionBlock}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         <Text style={{ textAlign: 'justify' }}>{data.summary}</Text>
+//                     </View>
+//                 );
+
+//                 if (section.key === 'education' && data.education?.length > 0) return (
+//                     <View key={idx} style={styles.sectionBlock}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         {data.education.map((edu, i) => (
+//                             <View key={i} style={{ marginBottom: 10 }}>
+//                                 <View style={styles.row}>
+//                                     <Text style={styles.bold}>{edu.institution}</Text>
+//                                     <Text>{edu.location || ''}</Text>
+//                                 </View>
+//                                 <View style={styles.row}>
+//                                     <Text style={styles.italic}>{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</Text>
+//                                     <Text style={styles.italic}>{formatDates(edu.startDate, edu.endDate)}</Text>
+//                                 </View>
 //                             </View>
-//                         );
-//                     }
+//                         ))}
+//                     </View>
+//                 );
 
-//                     if (section.key === 'education' && data.education?.length > 0) {
-//                         return (
-//                             <View key={idx} style={harvardStyles.section}>
-//                                 <Text style={harvardStyles.sectionTitle}>{section.title}</Text>
-//                                 {data.education.map((edu, i) => (
-//                                     <View key={i} style={{ marginBottom: 8 }}>
-//                                         <View style={harvardStyles.itemRow}>
-//                                             <Text style={harvardStyles.bold}>{edu.institution}</Text>
-//                                             <Text>{edu.startDate} - {edu.endDate}</Text>
-//                                         </View>
-//                                         <Text style={harvardStyles.italic}>{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</Text>
+//                 if (section.key === 'experience' && data.experience?.length > 0) return (
+//                     <View key={idx} style={styles.sectionBlock}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         {data.experience.map((exp, i) => (
+//                             <View key={i} style={{ marginBottom: 12 }}>
+//                                 <View style={styles.row}>
+//                                     <Text style={styles.bold}>{exp.position || exp.title || exp.jobTitle}</Text>
+//                                     <Text>{formatDates(exp.startDate, exp.endDate)}</Text>
+//                                 </View>
+//                                 <View style={styles.row}>
+//                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+//                                         <Text style={styles.italic}>{exp.company}</Text>
+//                                         {exp.link && (
+//                                             <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+//                                                 <Link src={safeUrl(exp.link)} style={{ color: '#000', textDecoration: 'none' }}>[{exp.linkLabel || 'Link'}]</Link>
+//                                             </Text>
+//                                         )}
+//                                     </View>
+//                                     {exp.location && <Text style={styles.italic}>{exp.location}</Text>}
+//                                 </View>
+//                                 {Array.isArray(exp.description) && exp.description.filter(Boolean).map((d, j) => (
+//                                     <View key={j} style={styles.bulletRow}>
+//                                         <Text style={styles.bullet}>•</Text>
+//                                         <Text style={styles.bulletText}>{d}</Text>
 //                                     </View>
 //                                 ))}
 //                             </View>
-//                         );
-//                     }
+//                         ))}
+//                     </View>
+//                 );
 
-//                     if (section.key === 'experience' && data.experience?.length > 0) {
-//                         return (
-//                             <View key={idx} style={harvardStyles.section}>
-//                                 <Text style={harvardStyles.sectionTitle}>{section.title}</Text>
-//                                 {data.experience.map((exp, i) => (
-//                                     <View key={i} style={{ marginBottom: 12 }}>
-//                                         <View style={harvardStyles.itemRow}>
-//                                             <Text style={harvardStyles.bold}>{exp.company}</Text>
-//                                             <Text>{exp.startDate} - {exp.endDate}</Text>
-//                                         </View>
-//                                         <Text style={harvardStyles.italic}>{exp.position || exp.jobTitle}</Text>
-//                                         {exp.description && (Array.isArray(exp.description) ? exp.description : [exp.description]).filter(Boolean).map((d, j) => (
-//                                             <View key={j} style={harvardStyles.bulletRow}>
-//                                                 <Text style={harvardStyles.bullet}>•</Text>
-//                                                 <Text style={harvardStyles.bulletText}>{d}</Text>
-//                                             </View>
-//                                         ))}
+//                 if (section.key === 'projects' && data.projects?.length > 0) return (
+//                     <View key={idx} style={styles.sectionBlock}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         {data.projects.map((proj, i) => (
+//                             <View key={i} style={{ marginBottom: 10 }}>
+//                                 <View style={styles.row}>
+//                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+//                                         <Text style={styles.bold}>{proj.name || proj.title}</Text>
+//                                         {proj.link && (
+//                                             <Text style={{ fontFamily: config.fonts.regular, marginLeft: 6 }}>
+//                                                 <Link src={safeUrl(proj.link)} style={{ color: '#000', textDecoration: 'none' }}>[{proj.linkLabel || 'Link'}]</Link>
+//                                             </Text>
+//                                         )}
 //                                     </View>
-//                                 ))}
-//                             </View>
-//                         );
-//                     }
-
-//                     if (section.key === 'projects' && data.projects?.length > 0) {
-//                         return (
-//                             <View key={idx} style={harvardStyles.section}>
-//                                 <Text style={harvardStyles.sectionTitle}>{section.title}</Text>
-//                                 {data.projects.map((proj, i) => (
-//                                     <View key={i} style={{ marginBottom: 8 }}>
-//                                         <Text style={harvardStyles.bold}>{proj.name || proj.title}</Text>
-//                                         {proj.description && (Array.isArray(proj.description) ? proj.description : [proj.description]).filter(Boolean).map((d, j) => (
-//                                             <View key={j} style={harvardStyles.bulletRow}>
-//                                                 <Text style={harvardStyles.bullet}>•</Text>
-//                                                 <Text style={harvardStyles.bulletText}>{d}</Text>
-//                                             </View>
-//                                         ))}
+//                                     {proj.date && <Text>{proj.date}</Text>}
+//                                 </View>
+//                                 {proj.subtitle && (
+//                                     <View style={styles.row}>
+//                                         <Text style={styles.italic}>{proj.subtitle}</Text>
 //                                     </View>
-//                                 ))}
-//                             </View>
-//                         );
-//                     }
-
-//                     if (section.key === 'skills' && data.skills?.length > 0) {
-//                         return (
-//                             <View key={idx} style={harvardStyles.section}>
-//                                 <Text style={harvardStyles.sectionTitle}>{section.title}</Text>
-//                                 {(Array.isArray(data.skills) ? data.skills : [data.skills]).filter(Boolean).map((skill, j) => (
-//                                     <View key={j} style={harvardStyles.bulletRow}>
-//                                         <Text style={harvardStyles.bullet}>•</Text>
-//                                         <Text style={harvardStyles.bulletText}>{renderSkillText(skill)}</Text>
-//                                     </View>
-//                                 ))}
-//                             </View>
-//                         );
-//                     }
-
-//                     if (section.isCustom && data[section.key]) {
-//                         return (
-//                             <View key={idx} style={harvardStyles.section}>
-//                                 <Text style={harvardStyles.sectionTitle}>{section.title}</Text>
-//                                 {section.type === 'text' ? <Text>{data[section.key]}</Text> : (
-//                                     Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
-//                                         <View key={i} style={{ marginBottom: 8 }}>
-//                                             <View style={harvardStyles.itemRow}>
-//                                                 <Text style={harvardStyles.bold}>{item.title}</Text>
-//                                                 <Text>{item.date}</Text>
-//                                             </View>
-//                                             {item.bulletPoints && (Array.isArray(item.bulletPoints) ? item.bulletPoints : [item.bulletPoints]).filter(Boolean).map((b, bIdx) => (
-//                                                 <View key={bIdx} style={harvardStyles.bulletRow}>
-//                                                     <Text style={harvardStyles.bullet}>•</Text>
-//                                                     <Text style={harvardStyles.bulletText}>{b}</Text>
-//                                                 </View>
-//                                             ))}
-//                                         </View>
-//                                     ))
 //                                 )}
+//                                 {Array.isArray(proj.description) && proj.description.filter(Boolean).map((d, j) => (
+//                                     <View key={j} style={styles.bulletRow}>
+//                                         <Text style={styles.bullet}>•</Text>
+//                                         <Text style={styles.bulletText}>{d}</Text>
+//                                     </View>
+//                                 ))}
 //                             </View>
-//                         );
-//                     }
-//                     return null;
-//                 })}
-//             </Page>
-//         </Document>
+//                         ))}
+//                     </View>
+//                 );
+
+//                 if (section.key === 'skills' && data.skills?.length > 0) return (
+//                     <View key={idx} style={styles.sectionBlock}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         <View style={{ paddingLeft: 4 }}>
+//                             {data.skills.map((group, j) => (
+//                                 <View key={j} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 2 }}>
+//                                     <Text style={{ fontFamily: config.fonts.bold }}>{group.category || 'Skills'}: </Text>
+//                                     <Text style={styles.bulletText}>{getSkillString(group.items)}</Text>
+//                                 </View>
+//                             ))}
+//                         </View>
+//                     </View>
+//                 );
+
+//                 if (section.isCustom && data[section.key]) return (
+//                     <View key={idx} style={styles.sectionBlock}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         {section.type === 'text' ? <Text style={{ paddingLeft: 4 }}>{data[section.key]}</Text> : (
+//                             section.title.toLowerCase() === 'languages' ? (
+//                                 <Text style={{ paddingLeft: 4 }}>
+//                                     {(Array.isArray(data[section.key]) ? data[section.key] : [])
+//                                         .map(lang => typeof lang === 'string' ? lang : (lang.bulletPoints || []).join(' '))
+//                                         .join(' | ')}
+//                                 </Text>
+//                             ) : (
+//                                 Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
+//                                     <View key={i} style={{ marginBottom: 10 }}>
+//                                         <View style={styles.row}>
+//                                             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+//                                                 <Text style={styles.bold}>{item.title}</Text>
+//                                                 {item.link && (
+//                                                     <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+//                                                         <Link src={safeUrl(item.link)} style={{ color: '#000', textDecoration: 'none' }}>[{item.linkLabel || 'Link'}]</Link>
+//                                                     </Text>
+//                                                 )}
+//                                             </View>
+//                                             <Text>{item.date}</Text>
+//                                         </View>
+//                                         {Array.isArray(item.bulletPoints) && item.bulletPoints.filter(Boolean).map((b, bIdx) => (
+//                                             <View key={bIdx} style={styles.bulletRow}>
+//                                                 <Text style={styles.bullet}>•</Text>
+//                                                 <Text style={styles.bulletText}>{b}</Text>
+//                                             </View>
+//                                         ))}
+//                                     </View>
+//                                 ))
+//                             )
+//                         )}
+//                     </View>
+//                 );
+
+//                 return null;
+//             })}
+//         </Page>
 //     );
 // };
 
-// // ==========================================
-// // 2. JAKE TEMPLATE (TECH STANDARD)
-// // ==========================================
-// const jakesStyles = StyleSheet.create({
-//     page: { fontFamily: 'Times-Roman', fontSize: 10, padding: '0.5in 0.75in', color: '#000' },
-//     header: { textAlign: 'center', marginBottom: 12 },
-//     name: { fontSize: 26, fontWeight: 'bold' },
-//     contact: { fontSize: 10, marginTop: 4 },
-//     sectionTitle: { fontSize: 14, fontWeight: 'bold', borderBottomWidth: 1, marginBottom: 6, marginTop: 12 },
-//     row: { flexDirection: 'row', justifyContent: 'space-between' },
-//     bold: { fontWeight: 'bold' },
-//     italic: { fontStyle: 'italic' },
-//     bulletRow: { flexDirection: 'row', marginTop: 2 },
-//     bullet: { width: 12 },
-//     bulletText: { flex: 1 }
-// });
+// // 🚀 CTO FIX: Re-calibrated padding, margins, and flex-start to fix layout collapses
+// const JakesTemplate = ({ data, config }) => {
+//     const styles = StyleSheet.create({
+//         page: { padding: config.layout.padding, fontFamily: config.fonts.regular, fontSize: config.fonts.size, color: '#000', lineHeight: config.layout.lineHeight },
+//         header: { textAlign: 'center', marginBottom: 6 },
+//         name: { fontFamily: config.fonts.bold, fontSize: config.fonts.h1, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2, lineHeight: 1 },
+        
+//         sectionTitle: { 
+//             fontFamily: config.fonts.bold, 
+//             fontSize: config.fonts.h2, 
+//             textTransform: 'uppercase',
+//             borderBottomWidth: 1, 
+//             borderBottomColor: '#000', 
+//             paddingBottom: 2,  
+//             marginBottom: 6,   
+//             marginTop: 14,     
+//             color: '#000' 
+//         },
+        
+//         // CTO FIX: alignItems MUST be flex-start. Baseline causes PDF engine to stack elements vertically.
+//         row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 },
+//         bold: { fontFamily: config.fonts.bold, fontSize: config.fonts.h3 },
+//         italic: { fontFamily: config.fonts.italic },
+//         bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 3, paddingLeft: 12 },
+//         bullet: { width: 14, fontFamily: config.fonts.regular },
+//         bulletText: { flex: 1, textAlign: 'justify' },
+//         sectionBlock: { marginBottom: 10 }
+//     });
 
-// const JakesTemplate = ({ data }) => {
 //     const personal = data.personalInfo || data.personalDetails || {};
 //     const sections = data.sections || [];
 //     const fullName = personal.name || `${personal.firstName || ''} ${personal.lastName || ''}`.trim() || 'Your Name';
 
 //     return (
-//         <Document>
-//             <Page size="A4" style={jakesStyles.page}>
-//                 <View style={jakesStyles.header}>
-//                     <Text style={jakesStyles.name}>{fullName}</Text>
-//                     <Text style={jakesStyles.contact}>
-//                         {[personal.email, personal.phone, personal.location, personal.linkedin, personal.github].filter(Boolean).join(' | ')}
-//                     </Text>
-//                 </View>
+//         <Page size="A4" style={styles.page}>
+//             <View style={styles.header}>
+//                 <Text style={styles.name}>{fullName}</Text>
+//                 <ContactRenderer personal={personal} justify="center" fontSize={config.fonts.small} />
+//             </View>
 
-//                 {sections.map((section, idx) => {
-//                     if (section.key === 'personalDetails') return null;
+//             {sections.map((section, idx) => {
+//                 if (section.key === 'personalDetails') return null;
 
-//                     if (section.key === 'summary' && data.summary) {
-//                         return (
-//                             <View key={idx}>
-//                                 <Text style={jakesStyles.sectionTitle}>{section.title}</Text>
-//                                 <Text>{data.summary}</Text>
+//                 if (section.key === 'summary' && data.summary) return (
+//                     <View key={idx}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         <Text style={{ textAlign: 'justify', paddingLeft: 4 }}>{data.summary}</Text>
+//                     </View>
+//                 );
+
+//                 if (section.key === 'education' && data.education?.length > 0) return (
+//                     <View key={idx}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         {data.education.map((edu, i) => (
+//                             <View key={i} style={styles.sectionBlock}>
+//                                 <View style={styles.row}>
+//                                     <Text style={styles.bold}>{edu.institution}</Text>
+//                                     <Text>{edu.location || ''}</Text>
+//                                 </View>
+//                                 <View style={styles.row}>
+//                                     <Text style={styles.italic}>{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</Text>
+//                                     <Text style={styles.italic}>{formatDates(edu.startDate, edu.endDate)}</Text>
+//                                 </View>
 //                             </View>
-//                         );
-//                     }
+//                         ))}
+//                     </View>
+//                 );
 
-//                     if (section.key === 'education' && data.education?.length > 0) {
-//                         return (
-//                             <View key={idx}>
-//                                 <Text style={jakesStyles.sectionTitle}>{section.title}</Text>
-//                                 {data.education.map((edu, i) => (
-//                                     <View key={i} style={{ marginBottom: 6 }}>
-//                                         <View style={jakesStyles.row}>
-//                                             <Text style={jakesStyles.bold}>{edu.institution}</Text>
-//                                             <Text>{edu.startDate} - {edu.endDate}</Text>
-//                                         </View>
-//                                         <Text style={jakesStyles.italic}>{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</Text>
+//                 if (section.key === 'experience' && data.experience?.length > 0) return (
+//                     <View key={idx}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         {data.experience.map((exp, i) => (
+//                             <View key={i} style={styles.sectionBlock}>
+//                                 <View style={styles.row}>
+//                                     <Text style={styles.bold}>{exp.position || exp.title || exp.jobTitle}</Text>
+//                                     <Text>{formatDates(exp.startDate, exp.endDate)}</Text>
+//                                 </View>
+//                                 <View style={styles.row}>
+//                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+//                                         <Text style={styles.italic}>{exp.company}</Text>
+//                                         {exp.link && (
+//                                             <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+//                                                 <Link src={safeUrl(exp.link)} style={{ color: '#000', textDecoration: 'none' }}>[{exp.linkLabel || 'Link'}]</Link>
+//                                             </Text>
+//                                         )}
+//                                     </View>
+//                                     {exp.location && <Text style={styles.italic}>{exp.location}</Text>}
+//                                 </View>
+//                                 {Array.isArray(exp.description) && exp.description.filter(Boolean).map((d, j) => (
+//                                     <View key={j} style={styles.bulletRow}>
+//                                         <Text style={styles.bullet}>•</Text>
+//                                         <Text style={styles.bulletText}>{d}</Text>
 //                                     </View>
 //                                 ))}
 //                             </View>
-//                         );
-//                     }
+//                         ))}
+//                     </View>
+//                 );
 
-//                     if (section.key === 'experience' && data.experience?.length > 0) {
-//                         return (
-//                             <View key={idx}>
-//                                 <Text style={jakesStyles.sectionTitle}>{section.title}</Text>
-//                                 {data.experience.map((exp, i) => (
-//                                     <View key={i} style={{ marginBottom: 8 }}>
-//                                         <View style={jakesStyles.row}>
-//                                             <Text style={jakesStyles.bold}>{exp.position || exp.jobTitle}</Text>
-//                                             <Text>{exp.startDate} - {exp.endDate}</Text>
-//                                         </View>
-//                                         <Text style={jakesStyles.italic}>{exp.company}</Text>
-//                                         {exp.description && (Array.isArray(exp.description) ? exp.description : [exp.description]).filter(Boolean).map((d, j) => (
-//                                             <View key={j} style={jakesStyles.bulletRow}>
-//                                                 <Text style={jakesStyles.bullet}>•</Text>
-//                                                 <Text style={jakesStyles.bulletText}>{d}</Text>
-//                                             </View>
-//                                         ))}
+//                 if (section.key === 'projects' && data.projects?.length > 0) return (
+//                     <View key={idx}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         {data.projects.map((proj, i) => (
+//                             <View key={i} style={styles.sectionBlock}>
+//                                 <View style={styles.row}>
+//                                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+//                                         <Text style={styles.bold}>{proj.name || proj.title}</Text>
+//                                         {proj.link && (
+//                                             <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+//                                                 <Link src={safeUrl(proj.link)} style={{ color: '#000', textDecoration: 'none' }}>[{proj.linkLabel || 'Link'}]</Link>
+//                                             </Text>
+//                                         )}
 //                                     </View>
-//                                 ))}
-//                             </View>
-//                         );
-//                     }
-
-//                     if (section.key === 'projects' && data.projects?.length > 0) {
-//                         return (
-//                             <View key={idx}>
-//                                 <Text style={jakesStyles.sectionTitle}>{section.title}</Text>
-//                                 {data.projects.map((proj, i) => (
-//                                     <View key={i} style={{ marginBottom: 6 }}>
-//                                         <Text style={jakesStyles.bold}>{proj.name || proj.title}</Text>
-//                                         {proj.description && (Array.isArray(proj.description) ? proj.description : [proj.description]).filter(Boolean).map((d, j) => (
-//                                             <View key={j} style={jakesStyles.bulletRow}>
-//                                                 <Text style={jakesStyles.bullet}>•</Text>
-//                                                 <Text style={jakesStyles.bulletText}>{d}</Text>
-//                                             </View>
-//                                         ))}
+//                                     {proj.date && <Text>{proj.date}</Text>}
+//                                 </View>
+//                                 {proj.subtitle && (
+//                                     <View style={styles.row}>
+//                                         <Text style={styles.italic}>{proj.subtitle}</Text>
 //                                     </View>
-//                                 ))}
-//                             </View>
-//                         );
-//                     }
-
-//                     if (section.key === 'skills' && data.skills?.length > 0) {
-//                         return (
-//                             <View key={idx}>
-//                                 <Text style={jakesStyles.sectionTitle}>{section.title}</Text>
-//                                 {(Array.isArray(data.skills) ? data.skills : [data.skills]).filter(Boolean).map((skill, j) => (
-//                                     <View key={j} style={jakesStyles.bulletRow}>
-//                                         <Text style={jakesStyles.bullet}>•</Text>
-//                                         <Text style={jakesStyles.bulletText}>{renderSkillText(skill)}</Text>
-//                                     </View>
-//                                 ))}
-//                             </View>
-//                         );
-//                     }
-
-//                     if (section.isCustom && data[section.key]) {
-//                         return (
-//                             <View key={idx}>
-//                                 <Text style={jakesStyles.sectionTitle}>{section.title}</Text>
-//                                 {section.type === 'text' ? <Text>{data[section.key]}</Text> : (
-//                                     Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
-//                                         <View key={i} style={{ marginBottom: 6 }}>
-//                                             <View style={jakesStyles.row}>
-//                                                 <Text style={jakesStyles.bold}>{item.title}</Text>
-//                                                 <Text>{item.date}</Text>
-//                                             </View>
-//                                             {item.bulletPoints && (Array.isArray(item.bulletPoints) ? item.bulletPoints : [item.bulletPoints]).filter(Boolean).map((b, bIdx) => (
-//                                                 <View key={bIdx} style={jakesStyles.bulletRow}>
-//                                                     <Text style={jakesStyles.bullet}>•</Text>
-//                                                     <Text style={jakesStyles.bulletText}>{b}</Text>
-//                                                 </View>
-//                                             ))}
-//                                         </View>
-//                                     ))
 //                                 )}
+//                                 {Array.isArray(proj.description) && proj.description.filter(Boolean).map((d, j) => (
+//                                     <View key={j} style={styles.bulletRow}>
+//                                         <Text style={styles.bullet}>•</Text>
+//                                         <Text style={styles.bulletText}>{d}</Text>
+//                                     </View>
+//                                 ))}
 //                             </View>
-//                         );
-//                     }
-//                     return null;
-//                 })}
-//             </Page>
-//         </Document>
+//                         ))}
+//                     </View>
+//                 );
+
+//                 if (section.key === 'skills' && data.skills?.length > 0) return (
+//                     <View key={idx}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         <View style={{ paddingLeft: 4 }}>
+//                             {data.skills.map((group, j) => (
+//                                 <View key={j} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 2 }}>
+//                                     <Text style={{ fontFamily: config.fonts.bold }}>{group.category || 'Skills'}: </Text>
+//                                     <Text style={styles.bulletText}>{getSkillString(group.items)}</Text>
+//                                 </View>
+//                             ))}
+//                         </View>
+//                     </View>
+//                 );
+
+//                 if (section.isCustom && data[section.key]) return (
+//                     <View key={idx}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         {section.type === 'text' ? <Text style={{ paddingLeft: 4 }}>{data[section.key]}</Text> : (
+//                             section.title.toLowerCase() === 'languages' ? (
+//                                 <Text style={{ paddingLeft: 4 }}>
+//                                     {(Array.isArray(data[section.key]) ? data[section.key] : [])
+//                                         .map(lang => typeof lang === 'string' ? lang : (lang.bulletPoints || []).join(' '))
+//                                         .join(' | ')}
+//                                 </Text>
+//                             ) : (
+//                                 Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
+//                                     <View key={i} style={styles.sectionBlock}>
+//                                         <View style={styles.row}>
+//                                             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+//                                                 <Text style={styles.bold}>{item.title}</Text>
+//                                                 {item.link && (
+//                                                     <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+//                                                         <Link src={safeUrl(item.link)} style={{ color: '#000', textDecoration: 'none' }}>[{item.linkLabel || 'Link'}]</Link>
+//                                                     </Text>
+//                                                 )}
+//                                             </View>
+//                                             <Text>{item.date}</Text>
+//                                         </View>
+//                                         {Array.isArray(item.bulletPoints) && item.bulletPoints.filter(Boolean).map((b, bIdx) => (
+//                                             <View key={bIdx} style={styles.bulletRow}>
+//                                                 <Text style={styles.bullet}>•</Text>
+//                                                 <Text style={styles.bulletText}>{b}</Text>
+//                                             </View>
+//                                         ))}
+//                                     </View>
+//                                 ))
+//                             )
+//                         )}
+//                     </View>
+//                 );
+
+//                 return null;
+//             })}
+//         </Page>
 //     );
 // };
 
-// // ==========================================
-// // 3. TEMPLATE REGISTRY
-// // ==========================================
+// const LatexTemplate = ({ data, config }) => {
+//     const styles = StyleSheet.create({
+//         page: { fontFamily: config.fonts.regular, fontSize: config.fonts.size, padding: config.layout.padding, color: '#000', lineHeight: config.layout.lineHeight },
+//         headerText: { textAlign: 'left', marginBottom: 12 },
+//         name: { fontFamily: config.fonts.bold, fontSize: config.fonts.h1, marginBottom: 2, lineHeight: 1 },
+//         sectionTitle: { fontFamily: config.fonts.bold, fontSize: config.fonts.h2, textTransform: 'uppercase', borderBottomWidth: 1.5, borderBottomColor: '#000', paddingBottom: 3, marginBottom: 8, marginTop: 14 },
+//         row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 },
+//         bold: { fontFamily: config.fonts.bold, fontSize: config.fonts.h3 },
+//         italic: { fontFamily: config.fonts.italic },
+//         bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 2, paddingLeft: 12 },
+//         bullet: { width: 12, fontFamily: config.fonts.bold },
+//         bulletText: { flex: 1, textAlign: 'justify' },
+//         sectionBlock: { marginBottom: 10 }
+//     });
+
+//     const personal = data.personalInfo || data.personalDetails || {};
+//     const sections = data.sections || [];
+//     const fullName = personal.name || `${personal.firstName || ''} ${personal.lastName || ''}`.trim() || 'Your Name';
+
+//     return (
+//         <Page size="A4" style={styles.page}>
+//             <View style={styles.headerText}>
+//                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
+//                     <Text style={styles.name}>{fullName}</Text>
+//                     <Text>{personal.phone}</Text>
+//                 </View>
+//                 <ContactRenderer personal={personal} justify="flex-start" fontSize={config.fonts.small} />
+//             </View>
+
+//             {sections.map((section, idx) => {
+//                 if (section.key === 'personalDetails') return null;
+
+//                 if (section.key === 'summary' && data.summary) return (
+//                     <View key={idx} style={styles.sectionBlock}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         <Text style={{ textAlign: 'justify', paddingLeft: 4 }}>{data.summary}</Text>
+//                     </View>
+//                 );
+
+//                 if (section.key === 'education' && data.education?.length > 0) return (
+//                     <View key={idx} style={styles.sectionBlock}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         {data.education.map((edu, i) => (
+//                             <View key={i} style={{ marginBottom: 10 }}>
+//                                 <View style={styles.row}>
+//                                     <Text style={styles.bold}>{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</Text>
+//                                     <Text style={{ fontFamily: config.fonts.bold }}>{formatDates(edu.startDate, edu.endDate)}</Text>
+//                                 </View>
+//                                 <View style={styles.row}>
+//                                     <Text>{edu.institution}</Text>
+//                                     <Text>{edu.location || ''}</Text>
+//                                 </View>
+//                             </View>
+//                         ))}
+//                     </View>
+//                 );
+
+//                 if (section.key === 'experience' && data.experience?.length > 0) return (
+//                     <View key={idx} style={styles.sectionBlock}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         {data.experience.map((exp, i) => (
+//                             <View key={i} style={{ marginBottom: 12 }}>
+//                                 <View style={styles.row}>
+//                                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
+//                                         <Text style={styles.bold}>{exp.position || exp.title || exp.jobTitle}</Text>
+//                                         {exp.link && (
+//                                             <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+//                                                 <Link src={safeUrl(exp.link)} style={{ color: '#000', textDecoration: 'none' }}>[{exp.linkLabel || 'Link'}]</Link>
+//                                             </Text>
+//                                         )}
+//                                     </View>
+//                                     <Text style={{ fontFamily: config.fonts.bold }}>{formatDates(exp.startDate, exp.endDate)}</Text>
+//                                 </View>
+//                                 <View style={styles.row}>
+//                                     <Text style={styles.italic}>{exp.company}</Text>
+//                                     {exp.location && <Text style={styles.italic}>{exp.location}</Text>}
+//                                 </View>
+//                                 {Array.isArray(exp.description) && exp.description.filter(Boolean).map((d, j) => (
+//                                     <View key={j} style={styles.bulletRow}>
+//                                         <Text style={styles.bullet}>•</Text>
+//                                         <Text style={styles.bulletText}>{d}</Text>
+//                                     </View>
+//                                 ))}
+//                             </View>
+//                         ))}
+//                     </View>
+//                 );
+
+//                 if (section.key === 'projects' && data.projects?.length > 0) return (
+//                     <View key={idx} style={styles.sectionBlock}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         {data.projects.map((proj, i) => (
+//                             <View key={i} style={{ marginBottom: 10 }}>
+//                                 <View style={styles.row}>
+//                                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
+//                                         <Text style={styles.bold}>{proj.name || proj.title}</Text>
+//                                         {proj.link && (
+//                                             <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+//                                                 <Link src={safeUrl(proj.link)} style={{ color: '#000', textDecoration: 'none' }}>[{proj.linkLabel || 'Link'}]</Link>
+//                                             </Text>
+//                                         )}
+//                                     </View>
+//                                     {proj.date && <Text style={{ fontFamily: config.fonts.bold }}>{proj.date}</Text>}
+//                                 </View>
+//                                 {proj.subtitle && (
+//                                     <View style={styles.row}>
+//                                         <Text style={styles.italic}>{proj.subtitle}</Text>
+//                                     </View>
+//                                 )}
+//                                 {Array.isArray(proj.description) && proj.description.filter(Boolean).map((d, j) => (
+//                                     <View key={j} style={styles.bulletRow}>
+//                                         <Text style={styles.bullet}>•</Text>
+//                                         <Text style={styles.bulletText}>{d}</Text>
+//                                     </View>
+//                                 ))}
+//                             </View>
+//                         ))}
+//                     </View>
+//                 );
+
+//                 if (section.key === 'skills' && data.skills?.length > 0) return (
+//                     <View key={idx} style={styles.sectionBlock}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         <View style={{ paddingLeft: 4 }}>
+//                             {data.skills.map((group, j) => (
+//                                 <View key={j} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 2 }}>
+//                                     <Text style={{ fontFamily: config.fonts.bold }}>{group.category || 'Skills'}: </Text>
+//                                     <Text style={styles.bulletText}>{getSkillString(group.items)}</Text>
+//                                 </View>
+//                             ))}
+//                         </View>
+//                     </View>
+//                 );
+
+//                 if (section.isCustom && data[section.key]) return (
+//                     <View key={idx} style={styles.sectionBlock}>
+//                         <Text style={styles.sectionTitle}>{section.title}</Text>
+//                         {section.type === 'text' ? <Text style={{ paddingLeft: 4 }}>{data[section.key]}</Text> : (
+//                             section.title.toLowerCase() === 'languages' ? (
+//                                 <Text style={{ paddingLeft: 4 }}>
+//                                     {(Array.isArray(data[section.key]) ? data[section.key] : [])
+//                                         .map(lang => typeof lang === 'string' ? lang : (lang.bulletPoints || []).join(' '))
+//                                         .join(' | ')}
+//                                 </Text>
+//                             ) : (
+//                                 Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
+//                                     <View key={i} style={{ marginBottom: 10 }}>
+//                                         <View style={styles.row}>
+//                                             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
+//                                                 <Text style={styles.bold}>{item.title}</Text>
+//                                                 {item.link && (
+//                                                     <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+//                                                         <Link src={safeUrl(item.link)} style={{ color: '#000', textDecoration: 'none' }}>[{item.linkLabel || 'Link'}]</Link>
+//                                                     </Text>
+//                                                 )}
+//                                             </View>
+//                                             <Text>{item.date}</Text>
+//                                         </View>
+//                                         {Array.isArray(item.bulletPoints) && item.bulletPoints.filter(Boolean).map((b, bIdx) => (
+//                                             <View key={bIdx} style={styles.bulletRow}>
+//                                                 <Text style={styles.bullet}>•</Text>
+//                                                 <Text style={styles.bulletText}>{b}</Text>
+//                                             </View>
+//                                         ))}
+//                                     </View>
+//                                 ))
+//                             )
+//                         )}
+//                     </View>
+//                 );
+
+//                 return null;
+//             })}
+//         </Page>
+//     );
+// };
+
 // const TEMPLATE_REGISTRY = {
 //     'harvard-ats': HarvardTemplate,
-//     'jakes-resume': JakesTemplate
+//     'jakes-resume': JakesTemplate,
+//     'latex-classic': LatexTemplate
 // };
 
-// // ==========================================
-// // 4. GENERATOR
-// // ==========================================
-// const generatePdf = async (resumeData, templateName = 'jakes-resume') => {
+// const generatePdf = async (resumeData, templateName = 'jakes-resume', documentStyle = {}) => {
 //     try {
 //         const Template = TEMPLATE_REGISTRY[templateName] || JakesTemplate;
-//         return await renderToStream(<Template data={resumeData} />);
+//         const config = getStylesConfig(documentStyle);
+//         return await renderToStream(<Template data={resumeData} config={config} />);
 //     } catch (err) {
 //         console.error("PDF Generation Error:", err);
 //         throw new Error('PDF generation failed');
@@ -348,466 +642,637 @@
 
 
 
+
+
+
+
+
+
 const React = require('react');
-const { renderToStream, Page, Text, View, Document, StyleSheet } = require('@react-pdf/renderer');
+const { renderToStream, Page, Text, View, Document, StyleSheet, Link } = require('@react-pdf/renderer');
 
-// ==========================================
-// HELPER: RENDER SKILLS
-// ==========================================
-const renderSkillText = (text) => {
-    if (typeof text === 'string' && text.includes(':')) {
-        const parts = text.split(':');
-        return <Text><Text style={{ fontWeight: 'bold' }}>{parts[0]}: </Text>{parts.slice(1).join(':')}</Text>;
-    }
-    return <Text>{text}</Text>;
+const safeUrl = (url) => {
+    if (!url) return '';
+    const trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    return `https://${trimmed}`;
 };
 
-// ==========================================
-// 1. HARVARD TEMPLATE (ATS SAFE)
-// ==========================================
-const harvardStyles = StyleSheet.create({
-    page: { fontFamily: 'Times-Roman', fontSize: 11, padding: '1in', color: '#000', lineHeight: 1.3 },
-    headerText: { textAlign: 'center', marginBottom: 16 },
-    name: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
-    contact: { fontSize: 10 },
-    section: { marginBottom: 10 },
-    sectionTitle: { fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', borderBottomWidth: 1, borderBottomColor: '#000', paddingBottom: 2, marginBottom: 8, marginTop: 16 },
-    itemRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    bold: { fontWeight: 'bold' },
-    italic: { fontStyle: 'italic' },
-    bulletRow: { flexDirection: 'row', marginTop: 3 },
-    bullet: { width: 15 },
-    bulletText: { flex: 1 }
-});
-
-const HarvardTemplate = ({ data }) => {
-    const personal = data.personalInfo || data.personalDetails || {};
-    const sections = data.sections || [];
-    const fullName = personal.name || `${personal.firstName || ''} ${personal.lastName || ''}`.trim() || 'Your Name';
-    return (
-        <Document>
-            <Page size="A4" style={harvardStyles.page}>
-                <View style={harvardStyles.headerText}>
-                    <Text style={harvardStyles.name}>{fullName}</Text>
-                    <Text style={harvardStyles.contact}>
-                        {[personal.email, personal.phone, personal.location, personal.linkedin, personal.github].filter(Boolean).join('   ')}
-                    </Text>
-                </View>
-                {sections.map((section, idx) => {
-                    if (section.key === 'personalDetails') return null;
-                    if (section.key === 'summary' && data.summary) {
-                        return (
-                            <View key={idx} style={harvardStyles.section}>
-                                <Text style={harvardStyles.sectionTitle}>{section.title}</Text>
-                                <Text>{data.summary}</Text>
-                            </View>
-                        );
-                    }
-                    if (section.key === 'education' && data.education?.length > 0) {
-                        return (
-                            <View key={idx} style={harvardStyles.section}>
-                                <Text style={harvardStyles.sectionTitle}>{section.title}</Text>
-                                {data.education.map((edu, i) => (
-                                    <View key={i} style={{ marginBottom: 8 }}>
-                                        <View style={harvardStyles.itemRow}>
-                                            <Text style={harvardStyles.bold}>{edu.institution}</Text>
-                                            <Text>{edu.startDate} - {edu.endDate}</Text>
-                                        </View>
-                                        <Text style={harvardStyles.italic}>{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        );
-                    }
-                    if (section.key === 'experience' && data.experience?.length > 0) {
-                        return (
-                            <View key={idx} style={harvardStyles.section}>
-                                <Text style={harvardStyles.sectionTitle}>{section.title}</Text>
-                                {data.experience.map((exp, i) => (
-                                    <View key={i} style={{ marginBottom: 12 }}>
-                                        <View style={harvardStyles.itemRow}>
-                                            <Text style={harvardStyles.bold}>{exp.company}</Text>
-                                            <Text>{exp.startDate} - {exp.endDate}</Text>
-                                        </View>
-                                        <Text style={harvardStyles.italic}>{exp.position || exp.jobTitle}</Text>
-                                        {exp.description && (Array.isArray(exp.description) ? exp.description : [exp.description]).filter(Boolean).map((d, j) => (
-                                            <View key={j} style={harvardStyles.bulletRow}>
-                                                <Text style={harvardStyles.bullet}>•</Text>
-                                                <Text style={harvardStyles.bulletText}>{d}</Text>
-                                            </View>
-                                        ))}
-                                    </View>
-                                ))}
-                            </View>
-                        );
-                    }
-                    if (section.key === 'projects' && data.projects?.length > 0) {
-                        return (
-                            <View key={idx} style={harvardStyles.section}>
-                                <Text style={harvardStyles.sectionTitle}>{section.title}</Text>
-                                {data.projects.map((proj, i) => (
-                                    <View key={i} style={{ marginBottom: 8 }}>
-                                        <Text style={harvardStyles.bold}>{proj.name || proj.title}</Text>
-                                        {proj.description && (Array.isArray(proj.description) ? proj.description : [proj.description]).filter(Boolean).map((d, j) => (
-                                            <View key={j} style={harvardStyles.bulletRow}>
-                                                <Text style={harvardStyles.bullet}>•</Text>
-                                                <Text style={harvardStyles.bulletText}>{d}</Text>
-                                            </View>
-                                        ))}
-                                    </View>
-                                ))}
-                            </View>
-                        );
-                    }
-                    if (section.key === 'skills' && data.skills?.length > 0) {
-                        return (
-                            <View key={idx} style={harvardStyles.section}>
-                                <Text style={harvardStyles.sectionTitle}>{section.title}</Text>
-                                {(Array.isArray(data.skills) ? data.skills : [data.skills]).filter(Boolean).map((skill, j) => (
-                                    <View key={j} style={harvardStyles.bulletRow}>
-                                        <Text style={harvardStyles.bullet}>•</Text>
-                                        <Text style={harvardStyles.bulletText}>{renderSkillText(skill)}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        );
-                    }
-                    if (section.isCustom && data[section.key]) {
-                        return (
-                            <View key={idx} style={harvardStyles.section}>
-                                <Text style={harvardStyles.sectionTitle}>{section.title}</Text>
-                                {section.type === 'text' ? <Text>{data[section.key]}</Text> : (
-                                    Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
-                                        <View key={i} style={{ marginBottom: 8 }}>
-                                            <View style={harvardStyles.itemRow}>
-                                                <Text style={harvardStyles.bold}>{item.title}</Text>
-                                                <Text>{item.date}</Text>
-                                            </View>
-                                            {item.bulletPoints && (Array.isArray(item.bulletPoints) ? item.bulletPoints : [item.bulletPoints]).filter(Boolean).map((b, bIdx) => (
-                                                <View key={bIdx} style={harvardStyles.bulletRow}>
-                                                    <Text style={harvardStyles.bullet}>•</Text>
-                                                    <Text style={harvardStyles.bulletText}>{b}</Text>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    ))
-                                )}
-                            </View>
-                        );
-                    }
-                    return null;
-                })}
-            </Page>
-        </Document>
-    );
+const formatDates = (start, end) => {
+    if (start && end) return `${start} - ${end}`;
+    return start || end || '';
 };
 
-// ==========================================
-// 2. JAKE TEMPLATE (TECH STANDARD)
-// ==========================================
-const jakesStyles = StyleSheet.create({
-    page: { fontFamily: 'Times-Roman', fontSize: 10, padding: '0.5in 0.75in', color: '#000' },
-    header: { textAlign: 'center', marginBottom: 12 },
-    name: { fontSize: 26, fontWeight: 'bold' },
-    contact: { fontSize: 10, marginTop: 4 },
-    sectionTitle: { fontSize: 14, fontWeight: 'bold', borderBottomWidth: 1, marginBottom: 6, marginTop: 12 },
-    row: { flexDirection: 'row', justifyContent: 'space-between' },
-    bold: { fontWeight: 'bold' },
-    italic: { fontStyle: 'italic' },
-    bulletRow: { flexDirection: 'row', marginTop: 2 },
-    bullet: { width: 12 },
-    bulletText: { flex: 1 }
-});
-
-const JakesTemplate = ({ data }) => {
-    const personal = data.personalInfo || data.personalDetails || {};
-    const sections = data.sections || [];
-    const fullName = personal.name || `${personal.firstName || ''} ${personal.lastName || ''}`.trim() || 'Your Name';
-    return (
-        <Document>
-            <Page size="A4" style={jakesStyles.page}>
-                <View style={jakesStyles.header}>
-                    <Text style={jakesStyles.name}>{fullName}</Text>
-                    <Text style={jakesStyles.contact}>
-                        {[personal.email, personal.phone, personal.location, personal.linkedin, personal.github].filter(Boolean).join(' | ')}
-                    </Text>
-                </View>
-                {sections.map((section, idx) => {
-                    if (section.key === 'personalDetails') return null;
-                    if (section.key === 'summary' && data.summary) {
-                        return (
-                            <View key={idx}>
-                                <Text style={jakesStyles.sectionTitle}>{section.title}</Text>
-                                <Text>{data.summary}</Text>
-                            </View>
-                        );
-                    }
-                    if (section.key === 'education' && data.education?.length > 0) {
-                        return (
-                            <View key={idx}>
-                                <Text style={jakesStyles.sectionTitle}>{section.title}</Text>
-                                {data.education.map((edu, i) => (
-                                    <View key={i} style={{ marginBottom: 6 }}>
-                                        <View style={jakesStyles.row}>
-                                            <Text style={jakesStyles.bold}>{edu.institution}</Text>
-                                            <Text>{edu.startDate} - {edu.endDate}</Text>
-                                        </View>
-                                        <Text style={jakesStyles.italic}>{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        );
-                    }
-                    if (section.key === 'experience' && data.experience?.length > 0) {
-                        return (
-                            <View key={idx}>
-                                <Text style={jakesStyles.sectionTitle}>{section.title}</Text>
-                                {data.experience.map((exp, i) => (
-                                    <View key={i} style={{ marginBottom: 8 }}>
-                                        <View style={jakesStyles.row}>
-                                            <Text style={jakesStyles.bold}>{exp.position || exp.jobTitle}</Text>
-                                            <Text>{exp.startDate} - {exp.endDate}</Text>
-                                        </View>
-                                        <Text style={jakesStyles.italic}>{exp.company}</Text>
-                                        {exp.description && (Array.isArray(exp.description) ? exp.description : [exp.description]).filter(Boolean).map((d, j) => (
-                                            <View key={j} style={jakesStyles.bulletRow}>
-                                                <Text style={jakesStyles.bullet}>•</Text>
-                                                <Text style={jakesStyles.bulletText}>{d}</Text>
-                                            </View>
-                                        ))}
-                                    </View>
-                                ))}
-                            </View>
-                        );
-                    }
-                    if (section.key === 'projects' && data.projects?.length > 0) {
-                        return (
-                            <View key={idx}>
-                                <Text style={jakesStyles.sectionTitle}>{section.title}</Text>
-                                {data.projects.map((proj, i) => (
-                                    <View key={i} style={{ marginBottom: 6 }}>
-                                        <Text style={jakesStyles.bold}>{proj.name || proj.title}</Text>
-                                        {proj.description && (Array.isArray(proj.description) ? proj.description : [proj.description]).filter(Boolean).map((d, j) => (
-                                            <View key={j} style={jakesStyles.bulletRow}>
-                                                <Text style={jakesStyles.bullet}>•</Text>
-                                                <Text style={jakesStyles.bulletText}>{d}</Text>
-                                            </View>
-                                        ))}
-                                    </View>
-                                ))}
-                            </View>
-                        );
-                    }
-                    if (section.key === 'skills' && data.skills?.length > 0) {
-                        return (
-                            <View key={idx}>
-                                <Text style={jakesStyles.sectionTitle}>{section.title}</Text>
-                                {(Array.isArray(data.skills) ? data.skills : [data.skills]).filter(Boolean).map((skill, j) => (
-                                    <View key={j} style={jakesStyles.bulletRow}>
-                                        <Text style={jakesStyles.bullet}>•</Text>
-                                        <Text style={jakesStyles.bulletText}>{renderSkillText(skill)}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        );
-                    }
-                    if (section.isCustom && data[section.key]) {
-                        return (
-                            <View key={idx}>
-                                <Text style={jakesStyles.sectionTitle}>{section.title}</Text>
-                                {section.type === 'text' ? <Text>{data[section.key]}</Text> : (
-                                    Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
-                                        <View key={i} style={{ marginBottom: 6 }}>
-                                            <View style={jakesStyles.row}>
-                                                <Text style={jakesStyles.bold}>{item.title}</Text>
-                                                <Text>{item.date}</Text>
-                                            </View>
-                                            {item.bulletPoints && (Array.isArray(item.bulletPoints) ? item.bulletPoints : [item.bulletPoints]).filter(Boolean).map((b, bIdx) => (
-                                                <View key={bIdx} style={jakesStyles.bulletRow}>
-                                                    <Text style={jakesStyles.bullet}>•</Text>
-                                                    <Text style={jakesStyles.bulletText}>{b}</Text>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    ))
-                                )}
-                            </View>
-                        );
-                    }
-                    return null;
-                })}
-            </Page>
-        </Document>
-    );
+const getSkillString = (items) => {
+    if (!items || !Array.isArray(items)) return '';
+    return items.map(item => typeof item === 'string' ? item : item.name).filter(Boolean).join(', ');
 };
 
-// ==========================================
-// 3. 🚀 NEW: ACADEMIC LATEX TEMPLATE
-// ==========================================
-const latexStyles = StyleSheet.create({
-    page: { fontFamily: 'Times-Roman', fontSize: 11, padding: '0.6in 0.5in', color: '#000', lineHeight: 1.15 },
-    headerText: { textAlign: 'left', marginBottom: 12 },
-    name: { fontSize: 24, fontWeight: 'bold', marginBottom: 2 },
-    contactRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, fontSize: 10 },
-    sectionTitle: { fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', borderBottomWidth: 1, borderBottomColor: '#000', paddingBottom: 2, marginBottom: 6, marginTop: 12 },
-    itemRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
-    bold: { fontWeight: 'bold' },
-    italic: { fontStyle: 'italic' },
-    bulletRow: { flexDirection: 'row', marginTop: 2, paddingLeft: 12 },
-    bullet: { width: 10, fontSize: 12 },
-    bulletText: { flex: 1 }
-});
-
-const LatexTemplate = ({ data }) => {
-    const personal = data.personalInfo || data.personalDetails || {};
-    const sections = data.sections || [];
-    const fullName = personal.name || `${personal.firstName || ''} ${personal.lastName || ''}`.trim() || 'Your Name';
+const getStylesConfig = (docStyle) => {
+    const isHelvetica = docStyle?.fontFamily !== 'Times-Roman';
+    const baseSize = Number(docStyle?.fontSize) || 10;
     
+    const marginsMap = { compact: 24, standard: 36, spacious: 48 };
+    const lineSpacingMap = { tight: 1.15, standard: 1.25, loose: 1.4 };
+
+    return {
+        fonts: {
+            regular: isHelvetica ? 'Helvetica' : 'Times-Roman',
+            bold: isHelvetica ? 'Helvetica-Bold' : 'Times-Bold',
+            italic: isHelvetica ? 'Helvetica-Oblique' : 'Times-Italic',
+            size: baseSize,
+            h1: baseSize * 2.4,    
+            h2: baseSize * 1.2,   
+            h3: baseSize * 1.05,   
+            small: baseSize * 0.95  
+        },
+        layout: {
+            padding: marginsMap[docStyle?.margins] || 36,
+            lineHeight: lineSpacingMap[docStyle?.lineSpacing] || 1.25
+        }
+    };
+};
+
+const ContactRenderer = ({ personal, justify, fontSize }) => {
+    const items = [];
+    if (personal.phone) items.push({ type: 'text', val: personal.phone });
+    if (personal.email) items.push({ type: 'text', val: personal.email });
+    if (personal.linkedin) items.push({ type: 'link', val: personal.linkedin, label: personal.linkedinLabel || 'LinkedIn' });
+    if (personal.github) items.push({ type: 'link', val: personal.github, label: personal.githubLabel || 'GitHub' });
+    if (personal.location) items.push({ type: 'text', val: personal.location });
+    
+    if (items.length === 0) return null;
+
+    const alignVal = justify === 'center' ? 'center' : (justify === 'flex-start' ? 'flex-start' : 'flex-end');
+
     return (
-        <Document>
-            <Page size="A4" style={latexStyles.page}>
-                <View style={latexStyles.headerText}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
-                        <Text style={latexStyles.name}>{fullName}</Text>
-                        <Text style={{ fontSize: 10 }}>{personal.phone}</Text>
-                    </View>
-                    <View style={latexStyles.contactRow}>
-                        <Text>{personal.email}</Text>
-                        {personal.linkedin && <Text>| {personal.linkedin}</Text>}
-                        {personal.github && <Text>| {personal.github}</Text>}
-                        {personal.location && <Text>| {personal.location}</Text>}
-                    </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: alignVal, marginBottom: 8 }}>
+            {items.map((item, index) => (
+                <View key={index} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                    {item.type === 'link' ? (
+                        <Link src={safeUrl(item.val)} style={{ fontSize, color: '#000', textDecoration: 'none' }}>
+                            {item.label}
+                        </Link>
+                    ) : (
+                        <Text style={{ fontSize, color: '#000' }}>{item.val}</Text>
+                    )}
+                    {index < items.length - 1 && (
+                        <Text style={{ fontSize, color: '#000', marginHorizontal: 6 }}>|</Text>
+                    )}
                 </View>
-
-                {sections.map((section, idx) => {
-                    if (section.key === 'personalDetails') return null;
-
-                    if (section.key === 'summary' && data.summary) {
-                        return (
-                            <View key={idx}>
-                                <Text style={latexStyles.sectionTitle}>{section.title}</Text>
-                                <Text>{data.summary}</Text>
-                            </View>
-                        );
-                    }
-                    if (section.key === 'education' && data.education?.length > 0) {
-                        return (
-                            <View key={idx}>
-                                <Text style={latexStyles.sectionTitle}>{section.title}</Text>
-                                {data.education.map((edu, i) => (
-                                    <View key={i} style={{ marginBottom: 6 }}>
-                                        <View style={latexStyles.itemRow}>
-                                            <Text style={latexStyles.bold}>{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</Text>
-                                            <Text style={latexStyles.bold}>{edu.startDate} - {edu.endDate}</Text>
-                                        </View>
-                                        <View style={latexStyles.itemRow}>
-                                            <Text>{edu.institution}</Text>
-                                        </View>
-                                    </View>
-                                ))}
-                            </View>
-                        );
-                    }
-                    if (section.key === 'projects' && data.projects?.length > 0) {
-                        return (
-                            <View key={idx}>
-                                <Text style={latexStyles.sectionTitle}>{section.title}</Text>
-                                {data.projects.map((proj, i) => (
-                                    <View key={i} style={{ marginBottom: 8 }}>
-                                        <Text style={latexStyles.bold}>{proj.name || proj.title}</Text>
-                                        {proj.description && (Array.isArray(proj.description) ? proj.description : [proj.description]).filter(Boolean).map((d, j) => (
-                                            <View key={j} style={latexStyles.bulletRow}>
-                                                <Text style={latexStyles.bullet}>•</Text>
-                                                <Text style={latexStyles.bulletText}>{d}</Text>
-                                            </View>
-                                        ))}
-                                    </View>
-                                ))}
-                            </View>
-                        );
-                    }
-                    if (section.key === 'experience' && data.experience?.length > 0) {
-                        return (
-                            <View key={idx}>
-                                <Text style={latexStyles.sectionTitle}>{section.title}</Text>
-                                {data.experience.map((exp, i) => (
-                                    <View key={i} style={{ marginBottom: 8 }}>
-                                        <View style={latexStyles.itemRow}>
-                                            <Text style={latexStyles.bold}>{exp.position || exp.jobTitle}</Text>
-                                            <Text style={latexStyles.bold}>{exp.startDate} - {exp.endDate}</Text>
-                                        </View>
-                                        <View style={latexStyles.itemRow}>
-                                            <Text style={latexStyles.italic}>{exp.company}</Text>
-                                        </View>
-                                        {exp.description && (Array.isArray(exp.description) ? exp.description : [exp.description]).filter(Boolean).map((d, j) => (
-                                            <View key={j} style={latexStyles.bulletRow}>
-                                                <Text style={latexStyles.bullet}>•</Text>
-                                                <Text style={latexStyles.bulletText}>{d}</Text>
-                                            </View>
-                                        ))}
-                                    </View>
-                                ))}
-                            </View>
-                        );
-                    }
-                    if (section.key === 'skills' && data.skills?.length > 0) {
-                        return (
-                            <View key={idx}>
-                                <Text style={latexStyles.sectionTitle}>{section.title}</Text>
-                                {(Array.isArray(data.skills) ? data.skills : [data.skills]).filter(Boolean).map((skill, j) => (
-                                    <View key={j} style={latexStyles.bulletRow}>
-                                        <Text style={latexStyles.bulletText}>{renderSkillText(skill)}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        );
-                    }
-                    if (section.isCustom && data[section.key]) {
-                        return (
-                            <View key={idx}>
-                                <Text style={latexStyles.sectionTitle}>{section.title}</Text>
-                                {section.type === 'text' ? <Text>{data[section.key]}</Text> : (
-                                    Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
-                                        <View key={i} style={{ marginBottom: 6 }}>
-                                            <View style={latexStyles.itemRow}>
-                                                <Text style={latexStyles.bold}>{item.title}</Text>
-                                                <Text>{item.date}</Text>
-                                            </View>
-                                            {item.bulletPoints && (Array.isArray(item.bulletPoints) ? item.bulletPoints : [item.bulletPoints]).filter(Boolean).map((b, bIdx) => (
-                                                <View key={bIdx} style={latexStyles.bulletRow}>
-                                                    <Text style={latexStyles.bullet}>•</Text>
-                                                    <Text style={latexStyles.bulletText}>{b}</Text>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    ))
-                                )}
-                            </View>
-                        );
-                    }
-                    return null;
-                })}
-            </Page>
-        </Document>
+            ))}
+        </View>
     );
 };
 
-// ==========================================
-// 4. TEMPLATE REGISTRY
-// ==========================================
+const HarvardTemplate = ({ data, config }) => {
+    const styles = StyleSheet.create({
+        page: { fontFamily: config.fonts.regular, fontSize: config.fonts.size, padding: config.layout.padding, color: '#000', lineHeight: config.layout.lineHeight },
+        headerText: { textAlign: 'center', marginBottom: 10 },
+        name: { fontFamily: config.fonts.bold, fontSize: config.fonts.h1, textTransform: 'uppercase', marginBottom: 24 },
+        sectionTitle: { fontFamily: config.fonts.bold, fontSize: config.fonts.h2, textTransform: 'uppercase', borderTopWidth: 1, borderTopColor: '#000', borderBottomWidth: 1, borderBottomColor: '#000', paddingVertical: 2, marginBottom: 4, marginTop: 10, textAlign: 'center' },
+        row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 1 },
+        bold: { fontFamily: config.fonts.bold, fontSize: config.fonts.h3 },
+        italic: { fontFamily: config.fonts.italic },
+        bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 2, paddingLeft: 8 },
+        bullet: { width: 14, fontFamily: config.fonts.bold },
+        bulletText: { flex: 1, textAlign: 'justify' },
+        sectionBlock: { marginBottom: 8 }
+    });
+
+    const personal = data.personalInfo || data.personalDetails || {};
+    const sections = data.sections || [];
+    const fullName = personal.name || `${personal.firstName || ''} ${personal.lastName || ''}`.trim() || 'Your Name';
+
+    return (
+        <Page size="A4" style={styles.page}>
+            <View style={styles.headerText}>
+                <Text style={styles.name}>{fullName}</Text>
+                <ContactRenderer personal={personal} justify="center" fontSize={config.fonts.small} />
+            </View>
+
+            {sections.map((section, idx) => {
+                if (section.key === 'personalDetails') return null;
+
+                if (section.key === 'summary' && data.summary) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        <Text style={{ textAlign: 'justify' }}>{data.summary}</Text>
+                    </View>
+                );
+
+                if (section.key === 'education' && data.education?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.education.map((edu, i) => (
+                            <View key={i} style={{ marginBottom: 6 }}>
+                                <View style={styles.row}>
+                                    <Text style={styles.bold}>{edu.institution}</Text>
+                                    <Text>{edu.location || ''}</Text>
+                                </View>
+                                <View style={styles.row}>
+                                    <Text style={styles.italic}>{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</Text>
+                                    <Text style={styles.italic}>{formatDates(edu.startDate, edu.endDate)}</Text>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'experience' && data.experience?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.experience.map((exp, i) => (
+                            <View key={i} style={{ marginBottom: 8 }}>
+                                <View style={styles.row}>
+                                    <Text style={styles.bold}>{exp.position || exp.title || exp.jobTitle}</Text>
+                                    <Text>{formatDates(exp.startDate, exp.endDate)}</Text>
+                                </View>
+                                <View style={styles.row}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={styles.italic}>{exp.company}</Text>
+                                        {exp.link && (
+                                            <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+                                                <Link src={safeUrl(exp.link)} style={{ color: '#000', textDecoration: 'none' }}>[{exp.linkLabel || 'Link'}]</Link>
+                                            </Text>
+                                        )}
+                                    </View>
+                                    {exp.location && <Text style={styles.italic}>{exp.location}</Text>}
+                                </View>
+                                {Array.isArray(exp.description) && exp.description.filter(Boolean).map((d, j) => (
+                                    <View key={j} style={styles.bulletRow}>
+                                        <Text style={styles.bullet}>•</Text>
+                                        <Text style={styles.bulletText}>{d}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'projects' && data.projects?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.projects.map((proj, i) => (
+                            <View key={i} style={{ marginBottom: 6 }}>
+                                <View style={styles.row}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={styles.bold}>{proj.name || proj.title}</Text>
+                                        {proj.link && (
+                                            <Text style={{ fontFamily: config.fonts.regular, marginLeft: 6 }}>
+                                                <Link src={safeUrl(proj.link)} style={{ color: '#000', textDecoration: 'none' }}>[{proj.linkLabel || 'Link'}]</Link>
+                                            </Text>
+                                        )}
+                                    </View>
+                                    {proj.date && <Text>{proj.date}</Text>}
+                                </View>
+                                {proj.subtitle && (
+                                    <View style={styles.row}>
+                                        <Text style={styles.italic}>{proj.subtitle}</Text>
+                                    </View>
+                                )}
+                                {Array.isArray(proj.description) && proj.description.filter(Boolean).map((d, j) => (
+                                    <View key={j} style={styles.bulletRow}>
+                                        <Text style={styles.bullet}>•</Text>
+                                        <Text style={styles.bulletText}>{d}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'skills' && data.skills?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        <View style={{ paddingLeft: 4 }}>
+                            {data.skills.map((group, j) => (
+                                <View key={j} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 2 }}>
+                                    <Text style={{ fontFamily: config.fonts.bold }}>{group.category || 'Skills'}: </Text>
+                                    <Text style={styles.bulletText}>{getSkillString(group.items)}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                );
+
+                if (section.isCustom && data[section.key]) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {section.type === 'text' ? <Text style={{ paddingLeft: 4 }}>{data[section.key]}</Text> : (
+                            section.title.toLowerCase() === 'languages' ? (
+                                <Text style={{ paddingLeft: 4 }}>
+                                    {(Array.isArray(data[section.key]) ? data[section.key] : [])
+                                        .map(lang => typeof lang === 'string' ? lang : (lang.bulletPoints || []).join(' '))
+                                        .join(' | ')}
+                                </Text>
+                            ) : (
+                                Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
+                                    <View key={i} style={{ marginBottom: 6 }}>
+                                        <View style={styles.row}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                                <Text style={styles.bold}>{item.title}</Text>
+                                                {item.link && (
+                                                    <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+                                                        <Link src={safeUrl(item.link)} style={{ color: '#000', textDecoration: 'none' }}>[{item.linkLabel || 'Link'}]</Link>
+                                                    </Text>
+                                                )}
+                                            </View>
+                                            <Text>{item.date}</Text>
+                                        </View>
+                                        {Array.isArray(item.bulletPoints) && item.bulletPoints.filter(Boolean).map((b, bIdx) => (
+                                            <View key={bIdx} style={styles.bulletRow}>
+                                                <Text style={styles.bullet}>•</Text>
+                                                <Text style={styles.bulletText}>{b}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                ))
+                            )
+                        )}
+                    </View>
+                );
+
+                return null;
+            })}
+        </Page>
+    );
+};
+
+const JakesTemplate = ({ data, config }) => {
+    const styles = StyleSheet.create({
+        page: { padding: config.layout.padding, fontFamily: config.fonts.regular, fontSize: config.fonts.size, color: '#000', lineHeight: config.layout.lineHeight },
+        header: { textAlign: 'center', marginBottom: 8 },
+        name: { fontFamily: config.fonts.bold, fontSize: config.fonts.h1, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 24 },
+        
+        sectionTitle: { 
+            fontFamily: config.fonts.bold, 
+            fontSize: config.fonts.h2, 
+            textTransform: 'uppercase',
+            borderBottomWidth: 1, 
+            borderBottomColor: '#000', 
+            paddingBottom: 2,  
+            marginBottom: 4,   
+            marginTop: 10,     
+            color: '#000' 
+        },
+        
+        row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 1 },
+        bold: { fontFamily: config.fonts.bold, fontSize: config.fonts.h3 },
+        italic: { fontFamily: config.fonts.italic },
+        bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 2, paddingLeft: 12 },
+        bullet: { width: 12, fontFamily: config.fonts.regular },
+        bulletText: { flex: 1, textAlign: 'justify' },
+        sectionBlock: { marginBottom: 6 }
+    });
+
+    const personal = data.personalInfo || data.personalDetails || {};
+    const sections = data.sections || [];
+    const fullName = personal.name || `${personal.firstName || ''} ${personal.lastName || ''}`.trim() || 'Your Name';
+
+    return (
+        <Page size="A4" style={styles.page}>
+            <View style={styles.header}>
+                <Text style={styles.name}>{fullName}</Text>
+                <ContactRenderer personal={personal} justify="center" fontSize={config.fonts.small} />
+            </View>
+
+            {sections.map((section, idx) => {
+                if (section.key === 'personalDetails') return null;
+
+                if (section.key === 'summary' && data.summary) return (
+                    <View key={idx}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        <Text style={{ textAlign: 'justify', paddingLeft: 4 }}>{data.summary}</Text>
+                    </View>
+                );
+
+                if (section.key === 'education' && data.education?.length > 0) return (
+                    <View key={idx}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.education.map((edu, i) => (
+                            <View key={i} style={styles.sectionBlock}>
+                                <View style={styles.row}>
+                                    <Text style={styles.bold}>{edu.institution}</Text>
+                                    <Text>{edu.location || ''}</Text>
+                                </View>
+                                <View style={styles.row}>
+                                    <Text style={styles.italic}>{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</Text>
+                                    <Text style={styles.italic}>{formatDates(edu.startDate, edu.endDate)}</Text>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'experience' && data.experience?.length > 0) return (
+                    <View key={idx}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.experience.map((exp, i) => (
+                            <View key={i} style={styles.sectionBlock}>
+                                <View style={styles.row}>
+                                    <Text style={styles.bold}>{exp.position || exp.title || exp.jobTitle}</Text>
+                                    <Text>{formatDates(exp.startDate, exp.endDate)}</Text>
+                                </View>
+                                <View style={styles.row}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={styles.italic}>{exp.company}</Text>
+                                        {exp.link && (
+                                            <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+                                                <Link src={safeUrl(exp.link)} style={{ color: '#000', textDecoration: 'none' }}>[{exp.linkLabel || 'Link'}]</Link>
+                                            </Text>
+                                        )}
+                                    </View>
+                                    {exp.location && <Text style={styles.italic}>{exp.location}</Text>}
+                                </View>
+                                {Array.isArray(exp.description) && exp.description.filter(Boolean).map((d, j) => (
+                                    <View key={j} style={styles.bulletRow}>
+                                        <Text style={styles.bullet}>•</Text>
+                                        <Text style={styles.bulletText}>{d}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'projects' && data.projects?.length > 0) return (
+                    <View key={idx}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.projects.map((proj, i) => (
+                            <View key={i} style={styles.sectionBlock}>
+                                <View style={styles.row}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <Text style={styles.bold}>{proj.name || proj.title}</Text>
+                                        {proj.link && (
+                                            <Text style={{ fontFamily: config.fonts.regular, marginLeft: 6 }}>
+                                                <Link src={safeUrl(proj.link)} style={{ color: '#000', textDecoration: 'none' }}>[{proj.linkLabel || 'Link'}]</Link>
+                                            </Text>
+                                        )}
+                                    </View>
+                                    {proj.date && <Text>{proj.date}</Text>}
+                                </View>
+                                {proj.subtitle && (
+                                    <View style={styles.row}>
+                                        <Text style={styles.italic}>{proj.subtitle}</Text>
+                                    </View>
+                                )}
+                                {Array.isArray(proj.description) && proj.description.filter(Boolean).map((d, j) => (
+                                    <View key={j} style={styles.bulletRow}>
+                                        <Text style={styles.bullet}>•</Text>
+                                        <Text style={styles.bulletText}>{d}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'skills' && data.skills?.length > 0) return (
+                    <View key={idx}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        <View style={{ paddingLeft: 4 }}>
+                            {data.skills.map((group, j) => (
+                                <View key={j} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 2 }}>
+                                    <Text style={{ fontFamily: config.fonts.bold }}>{group.category || 'Skills'}: </Text>
+                                    <Text style={styles.bulletText}>{getSkillString(group.items)}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                );
+
+                if (section.isCustom && data[section.key]) return (
+                    <View key={idx}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {section.type === 'text' ? <Text style={{ paddingLeft: 4 }}>{data[section.key]}</Text> : (
+                            section.title.toLowerCase() === 'languages' ? (
+                                <Text style={{ paddingLeft: 4 }}>
+                                    {(Array.isArray(data[section.key]) ? data[section.key] : [])
+                                        .map(lang => typeof lang === 'string' ? lang : (lang.bulletPoints || []).join(' '))
+                                        .join(' | ')}
+                                </Text>
+                            ) : (
+                                Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
+                                    <View key={i} style={styles.sectionBlock}>
+                                        <View style={styles.row}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                                <Text style={styles.bold}>{item.title}</Text>
+                                                {item.link && (
+                                                    <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+                                                        <Link src={safeUrl(item.link)} style={{ color: '#000', textDecoration: 'none' }}>[{item.linkLabel || 'Link'}]</Link>
+                                                    </Text>
+                                                )}
+                                            </View>
+                                            <Text>{item.date}</Text>
+                                        </View>
+                                        {Array.isArray(item.bulletPoints) && item.bulletPoints.filter(Boolean).map((b, bIdx) => (
+                                            <View key={bIdx} style={styles.bulletRow}>
+                                                <Text style={styles.bullet}>•</Text>
+                                                <Text style={styles.bulletText}>{b}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                ))
+                            )
+                        )}
+                    </View>
+                );
+
+                return null;
+            })}
+        </Page>
+    );
+};
+
+const LatexTemplate = ({ data, config }) => {
+    const styles = StyleSheet.create({
+        page: { fontFamily: config.fonts.regular, fontSize: config.fonts.size, padding: config.layout.padding, color: '#000', lineHeight: config.layout.lineHeight },
+        headerText: { textAlign: 'left', marginBottom: 10 },
+        name: { fontFamily: config.fonts.bold, fontSize: config.fonts.h1, marginBottom: 24 },
+        sectionTitle: { fontFamily: config.fonts.bold, fontSize: config.fonts.h2, textTransform: 'uppercase', borderBottomWidth: 1.5, borderBottomColor: '#000', paddingBottom: 2, marginBottom: 6, marginTop: 10 },
+        row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 1 },
+        bold: { fontFamily: config.fonts.bold, fontSize: config.fonts.h3 },
+        italic: { fontFamily: config.fonts.italic },
+        bulletRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 2, paddingLeft: 12 },
+        bullet: { width: 12, fontFamily: config.fonts.bold },
+        bulletText: { flex: 1, textAlign: 'justify' },
+        sectionBlock: { marginBottom: 6 }
+    });
+
+    const personal = data.personalInfo || data.personalDetails || {};
+    const sections = data.sections || [];
+    const fullName = personal.name || `${personal.firstName || ''} ${personal.lastName || ''}`.trim() || 'Your Name';
+
+    return (
+        <Page size="A4" style={styles.page}>
+            <View style={styles.headerText}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 4 }}>
+                    <Text style={styles.name}>{fullName}</Text>
+                    <Text>{personal.phone}</Text>
+                </View>
+                <ContactRenderer personal={personal} justify="flex-start" fontSize={config.fonts.small} />
+            </View>
+
+            {sections.map((section, idx) => {
+                if (section.key === 'personalDetails') return null;
+
+                if (section.key === 'summary' && data.summary) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        <Text style={{ textAlign: 'justify', paddingLeft: 4 }}>{data.summary}</Text>
+                    </View>
+                );
+
+                if (section.key === 'education' && data.education?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.education.map((edu, i) => (
+                            <View key={i} style={{ marginBottom: 6 }}>
+                                <View style={styles.row}>
+                                    <Text style={styles.bold}>{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</Text>
+                                    <Text style={{ fontFamily: config.fonts.bold }}>{formatDates(edu.startDate, edu.endDate)}</Text>
+                                </View>
+                                <View style={styles.row}>
+                                    <Text>{edu.institution}</Text>
+                                    <Text>{edu.location || ''}</Text>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'experience' && data.experience?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.experience.map((exp, i) => (
+                            <View key={i} style={{ marginBottom: 8 }}>
+                                <View style={styles.row}>
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
+                                        <Text style={styles.bold}>{exp.position || exp.title || exp.jobTitle}</Text>
+                                        {exp.link && (
+                                            <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+                                                <Link src={safeUrl(exp.link)} style={{ color: '#000', textDecoration: 'none' }}>[{exp.linkLabel || 'Link'}]</Link>
+                                            </Text>
+                                        )}
+                                    </View>
+                                    <Text style={{ fontFamily: config.fonts.bold }}>{formatDates(exp.startDate, exp.endDate)}</Text>
+                                </View>
+                                <View style={styles.row}>
+                                    <Text style={styles.italic}>{exp.company}</Text>
+                                    {exp.location && <Text style={styles.italic}>{exp.location}</Text>}
+                                </View>
+                                {Array.isArray(exp.description) && exp.description.filter(Boolean).map((d, j) => (
+                                    <View key={j} style={styles.bulletRow}>
+                                        <Text style={styles.bullet}>•</Text>
+                                        <Text style={styles.bulletText}>{d}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'projects' && data.projects?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.projects.map((proj, i) => (
+                            <View key={i} style={{ marginBottom: 6 }}>
+                                <View style={styles.row}>
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
+                                        <Text style={styles.bold}>{proj.name || proj.title}</Text>
+                                        {proj.link && (
+                                            <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+                                                <Link src={safeUrl(proj.link)} style={{ color: '#000', textDecoration: 'none' }}>[{proj.linkLabel || 'Link'}]</Link>
+                                            </Text>
+                                        )}
+                                    </View>
+                                    {proj.date && <Text style={{ fontFamily: config.fonts.bold }}>{proj.date}</Text>}
+                                </View>
+                                {proj.subtitle && (
+                                    <View style={styles.row}>
+                                        <Text style={styles.italic}>{proj.subtitle}</Text>
+                                    </View>
+                                )}
+                                {Array.isArray(proj.description) && proj.description.filter(Boolean).map((d, j) => (
+                                    <View key={j} style={styles.bulletRow}>
+                                        <Text style={styles.bullet}>•</Text>
+                                        <Text style={styles.bulletText}>{d}</Text>
+                                    </View>
+                                ))}
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'skills' && data.skills?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        <View style={{ paddingLeft: 4 }}>
+                            {data.skills.map((group, j) => (
+                                <View key={j} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 2 }}>
+                                    <Text style={{ fontFamily: config.fonts.bold }}>{group.category || 'Skills'}: </Text>
+                                    <Text style={styles.bulletText}>{getSkillString(group.items)}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                );
+
+                if (section.isCustom && data[section.key]) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {section.type === 'text' ? <Text style={{ paddingLeft: 4 }}>{data[section.key]}</Text> : (
+                            section.title.toLowerCase() === 'languages' ? (
+                                <Text style={{ paddingLeft: 4 }}>
+                                    {(Array.isArray(data[section.key]) ? data[section.key] : [])
+                                        .map(lang => typeof lang === 'string' ? lang : (lang.bulletPoints || []).join(' '))
+                                        .join(' | ')}
+                                </Text>
+                            ) : (
+                                Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
+                                    <View key={i} style={{ marginBottom: 6 }}>
+                                        <View style={styles.row}>
+                                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
+                                                <Text style={styles.bold}>{item.title}</Text>
+                                                {item.link && (
+                                                    <Text style={{ fontFamily: config.fonts.regular, marginLeft: 4 }}>
+                                                        <Link src={safeUrl(item.link)} style={{ color: '#000', textDecoration: 'none' }}>[{item.linkLabel || 'Link'}]</Link>
+                                                    </Text>
+                                                )}
+                                            </View>
+                                            <Text>{item.date}</Text>
+                                        </View>
+                                        {Array.isArray(item.bulletPoints) && item.bulletPoints.filter(Boolean).map((b, bIdx) => (
+                                            <View key={bIdx} style={styles.bulletRow}>
+                                                <Text style={styles.bullet}>•</Text>
+                                                <Text style={styles.bulletText}>{b}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                ))
+                            )
+                        )}
+                    </View>
+                );
+
+                return null;
+            })}
+        </Page>
+    );
+};
+
 const TEMPLATE_REGISTRY = {
     'harvard-ats': HarvardTemplate,
     'jakes-resume': JakesTemplate,
-    'latex-classic': LatexTemplate // 🚀 Added to registry
+    'latex-classic': LatexTemplate
 };
 
-// ==========================================
-// 5. GENERATOR
-// ==========================================
-const generatePdf = async (resumeData, templateName = 'jakes-resume') => {
+const generatePdf = async (resumeData, templateName = 'jakes-resume', documentStyle = {}) => {
     try {
         const Template = TEMPLATE_REGISTRY[templateName] || JakesTemplate;
-        return await renderToStream(<Template data={resumeData} />);
+        const config = getStylesConfig(documentStyle);
+        return await renderToStream(<Template data={resumeData} config={config} />);
     } catch (err) {
         console.error("PDF Generation Error:", err);
         throw new Error('PDF generation failed');

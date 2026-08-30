@@ -1,9 +1,13 @@
 import axios from 'axios';
 
-// Production frontend and backend are both hosted on Hostinger.
-// Keep the API URL fixed so deployment environment variables cannot point
-// the authentication requests to an old provider or omit /api.
-const API_BASE_URL = 'https://haveresume-com-878344.hostingersite.com/api';
+// Use the Hostinger environment variable when it is configured.
+// If it is missing, use the production Hostinger backend as a safe fallback.
+const FALLBACK_API_URL = 'https://haveresume-com-878344.hostingersite.com';
+const configuredApiUrl = import.meta.env.VITE_API_URL || FALLBACK_API_URL;
+const normalizedApiUrl = configuredApiUrl.replace(/\/+$/, '');
+const API_BASE_URL = normalizedApiUrl.endsWith('/api')
+  ? normalizedApiUrl
+  : `${normalizedApiUrl}/api`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,

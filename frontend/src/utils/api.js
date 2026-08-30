@@ -1,15 +1,12 @@
 import axios from 'axios';
 
-// Normalize the backend URL so production still works if VITE_API_URL
-// is entered with or without /api, and with or without a trailing slash.
-const configuredApiUrl = import.meta.env.VITE_API_URL || 'https://resume-builder-t50m.onrender.com';
-const normalizedApiUrl = configuredApiUrl.replace(/\/+$/, '');
-const apiBaseUrl = normalizedApiUrl.endsWith('/api')
-  ? normalizedApiUrl
-  : `${normalizedApiUrl}/api`;
+// Production frontend and backend are both hosted on Hostinger.
+// Keep the API URL fixed so deployment environment variables cannot point
+// the authentication requests to an old provider or omit /api.
+const API_BASE_URL = 'https://haveresume-com-878344.hostingersite.com/api';
 
 const api = axios.create({
-  baseURL: apiBaseUrl,
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 

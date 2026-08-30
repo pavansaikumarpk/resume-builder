@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { Link, useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import { AuthLayout } from './AuthLayout';
 import { Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
 
@@ -38,49 +39,35 @@ export const LoginPage = () => {
     }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleSuccess = async (credentialResponse) => {
     setError('');
 
-    if (!window.google?.accounts?.id) {
-      setError('Google Sign-In is not available. Please refresh the page and try again.');
+    if (!credentialResponse?.credential) {
+      setError('Google did not return a login credential. Please try again.');
       return;
     }
 
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      setError('Google Sign-In is not configured.');
-      return;
+    const result = await googleAuth(credentialResponse.credential);
+
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      setError(result.message || 'Google Authentication failed.');
     }
-
-    window.google.accounts.id.initialize({
-      client_id: clientId,
-      callback: async (response) => {
-        const result = await googleAuth(response.credential);
-
-        if (result.success) {
-          navigate('/dashboard');
-        } else {
-          setError(result.message || 'Google Authentication failed.');
-        }
-      },
-    });
-
-    window.google.accounts.id.prompt();
   };
 
   return (
     <AuthLayout title="Welcome back" subtitle="Enter your credentials to access your workspace.">
       {error && <div className="mb-6 p-3 bg-red-50 text-red-600 text-sm font-bold rounded-lg border border-red-100">{error}</div>}
 
-      <button
-        type="button"
-        onClick={handleGoogleLogin}
-        disabled={isLoading}
-        className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 text-slate-700 font-bold text-sm py-3 rounded-xl shadow-sm hover:bg-slate-50 transition-all mb-6 disabled:opacity-70"
-      >
-        <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
-        Continue with Google
-      </button>
+      <div className="w-full mb-6 flex justify-center">
+        <GoogleLogin
+          onSuccess={handleGoogleSuccess}
+          onError={() => setError('Google Sign-In failed. Please try again.')}
+          useOneTap={false}
+          width="350"
+        />
+      </div>
 
       <div className="flex items-center gap-4 mb-6">
         <div className="h-px bg-slate-200 flex-1"></div>

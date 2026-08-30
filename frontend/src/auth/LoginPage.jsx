@@ -9,7 +9,10 @@ const AuthInput = ({ label, icon: Icon, type, value, onChange }) => (
   <div className="relative group w-full mb-4">
     <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors z-10" size={18} />
     <input
-      type={type} value={value} onChange={onChange} required
+      type={type}
+      value={value}
+      onChange={onChange}
+      required
       className="w-full bg-white border border-slate-200 rounded-xl pt-6 pb-2 pl-11 pr-4 text-sm font-medium text-slate-800 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all peer shadow-sm"
       placeholder=" "
     />
@@ -77,13 +80,7 @@ export const LoginPage = () => {
 
       <form onSubmit={handleSubmit} className="flex flex-col">
         <AuthInput label="Email Address" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-
-        <div className="relative">
-          <AuthInput label="Password" icon={Lock} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <Link to="/forgot-password" className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors z-20">
-            Forgot?
-          </Link>
-        </div>
+        <AuthInput label="Password" icon={Lock} type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
 
         <button
           type="submit"

@@ -11,16 +11,5 @@
       "source": "/(.*)",
       "destination": "/server.js"
     }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "https://abdevillerss.github.io" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
-        { "key": "Access-Control-Allow-Headers", "value": "Authorization, Content-Type" }
-      ]
-    }
   ]
 }
-

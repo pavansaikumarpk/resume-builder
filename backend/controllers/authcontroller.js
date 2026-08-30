@@ -1,231 +1,106 @@
-// const User = require('../models/usermodel');
-// const jwt = require('jsonwebtoken');
-// const bcrypt = require('bcryptjs');
-// const { OAuth2Client } = require('google-auth-library');
-
-// // @desc    Register new user
-// const registerUser = async (req, res) => {
-//     try {
-//         const { username, email, password } = req.body;
-
-//         if (!username || !email || !password) {
-//             return res.status(400).json({ message: 'Please add all fields' });
-//         }
-
-//         const userExists = await User.findOne({ email });
-//         if (userExists) {
-//             return res.status(400).json({ message: 'User already exists' });
-//         }
-
-//         // 🚀 MY MISTAKE CORRECTED: Passing the raw password. 
-//         // Your usermodel.js pre('save') hook will hash this securely.
-//         const user = await User.create({
-//             username,
-//             email,
-//             password: password, 
-//         });
-
-//         if (user) {
-//             const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-//                 expiresIn: '30d',
-//             });
-
-//             res.cookie('jwt', token, {
-//                 httpOnly: true,
-//                 secure: true, 
-//                 sameSite: 'none', 
-//                 maxAge: 30 * 24 * 60 * 60 * 1000, 
-//             });
-
-//             return res.status(201).json({
-//                 _id: user._id,
-//                 username: user.username,
-//                 email: user.email,
-//                 token: token 
-//             });
-//         }
-//     } catch (error) {
-//         console.error("Registration Error:", error);
-//         res.status(500).json({ message: 'Server error during registration' });
-//     }
-// };
-
-// // @desc    Authenticate a user
-// const loginUser = async (req, res) => {
-//     try {
-//         const { email, password } = req.body;
-//         const user = await User.findOne({ email });
-
-//         if (!user) {
-//             return res.status(401).json({ message: 'User not found. Please sign up.' });
-//         }
-
-//         // Standard secure login
-//         const isMatch = await bcrypt.compare(password, user.password);
-
-//         if (!isMatch) {
-//             return res.status(401).json({ message: 'Incorrect email or password.' });
-//         }
-
-//         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
-
-//         res.cookie('jwt', token, {
-//             httpOnly: true,
-//             secure: true,
-//             sameSite: 'none',
-//             maxAge: 30 * 24 * 60 * 60 * 1000,
-//         });
-
-//         return res.status(200).json({
-//             _id: user._id,
-//             username: user.username,
-//             email: user.email,
-//             token: token
-//         });
-
-//     } catch (error) {
-//         console.error("Login Error:", error);
-//         res.status(500).json({ message: 'Server error during login' });
-//     }
-// };
-
-// // @desc    Authenticate via Google
-// const googleAuth = async (req, res) => {
-//     try {
-//         const { token } = req.body;
-        
-//         if (!process.env.GOOGLE_CLIENT_ID) {
-//             console.error("SERVER ERROR: GOOGLE_CLIENT_ID is missing from Render environment.");
-//             return res.status(500).json({ message: 'Server configuration error.' });
-//         }
-
-//         const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-        
-//         // 🚀 WE LOG THIS TO SEE IF VERIFICATION FAILS
-//         console.log("Attempting to verify Google Token for Audience:", process.env.GOOGLE_CLIENT_ID);
-
-//         const ticket = await client.verifyIdToken({
-//             idToken: token,
-//             audience: process.env.GOOGLE_CLIENT_ID,
-//         });
-        
-//         const { email, name } = ticket.getPayload();
-//         console.log(`Google Token verified successfully for: ${email}`);
-
-//         let user = await User.findOne({ email });
-//         if (!user) {
-//             // For Google Auth, we create a random strong password since they don't use one
-//             const randomPassword = Math.random().toString(36).slice(-10) + "A1!";
-//             user = await User.create({ username: name, email, password: randomPassword });
-//         }
-
-//         const jwtToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
-
-//         res.cookie('jwt', jwtToken, {
-//             httpOnly: true,
-//             secure: true,
-//             sameSite: 'none',
-//             maxAge: 30 * 24 * 60 * 60 * 1000,
-//         });
-
-//         return res.status(200).json({
-//             _id: user._id,
-//             username: user.username,
-//             email: user.email,
-//             token: jwtToken,
-//         });
-//     } catch (error) {
-//         // 🚀 THIS WILL TELL US EXACTLY WHY GOOGLE FAILED IN THE RENDER LOGS
-//         console.error("GOOGLE AUTH FATAL ERROR:", error.message);
-//         res.status(401).json({ message: 'Google Authentication failed.', error: error.message });
-//     }
-// };
-
-// module.exports = {
-//     registerUser,
-//     loginUser,
-//     authUser: loginUser, 
-//     googleAuth
-// };
-
-
-
-
-
-
-
-
-
-
-
 const User = require('../models/usermodel');
 const jwt = require('jsonwebtoken');
-const { OAuth2Client } = require('google-auth-library'); // 🚀 Only new import
+const crypto = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
 
 const generateToken = (id) => {
+    if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET is not configured');
+    }
+
     return jwt.sign({ id }, process.env.JWT_SECRET, {
-        expiresIn: '30d', // Token expires in 30 days
+        expiresIn: '30d',
     });
 };
 
-// ----------------------------------------------------
-// 100% YOUR ORIGINAL CODE - UNTOUCHED
-// ----------------------------------------------------
+const isValidEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
 const registerUser = async (req, res) => {
-    const { username, email, password } = req.body;
+    const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+
+    if (!username || !email || !password) {
+        return res.status(400).json({ message: 'Please fill in all fields.' });
+    }
+
+    if (username.length < 2 || username.length > 80) {
+        return res.status(400).json({ message: 'Name must be between 2 and 80 characters.' });
+    }
+
+    if (!isValidEmail(email)) {
+        return res.status(400).json({ message: 'Please enter a valid email address.' });
+    }
+
+    if (password.length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+    }
+
     try {
         const userExists = await User.findOne({ email });
         if (userExists) {
-            return res.status(400).json({ message: 'User already exists' });
+            return res.status(400).json({ message: 'User already exists. Please log in.' });
         }
+
         const user = await User.create({
             username,
             email,
             password,
+            authProvider: 'local',
         });
-        if (user) {
-            res.status(201).json({
-                _id: user._id,
-                username: user.username,
-                email: user.email,
-                token: generateToken(user._id),
-            });
-        } else {
-            res.status(400).json({ message: 'Invalid user data' });
-        }
+
+        return res.status(201).json({
+            _id: user._id,
+            username: user.username,
+            email: user.email,
+            token: generateToken(user._id),
+        });
     } catch (error) {
-        res.status(500).json({ message: 'Server Error' });
+        console.error('Registration Error:', error);
+        return res.status(500).json({ message: 'Server error during registration.' });
     }
 };
 
 const loginUser = async (req, res) => {
-    const { email, password } = req.body;
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required.' });
+    }
+
     try {
         const user = await User.findOne({ email });
+
         if (user && (await user.matchPassword(password))) {
-            res.json({
+            return res.json({
                 _id: user._id,
                 username: user.username,
                 email: user.email,
                 token: generateToken(user._id),
             });
-        } else {
-            res.status(401).json({ message: 'Invalid email or password' });
         }
+
+        return res.status(401).json({ message: 'Invalid email or password.' });
     } catch (error) {
-        res.status(500).json({ message: 'Server Error' });
+        console.error('Login Error:', error);
+        return res.status(500).json({ message: 'Server error during login.' });
     }
 };
 
-// ----------------------------------------------------
-// NEW GOOGLE AUTHENTICATION LOGIC
-// ----------------------------------------------------
 const googleAuth = async (req, res) => {
     try {
         const { token } = req.body;
-        
+
+        if (!token) {
+            return res.status(400).json({ message: 'Google credential is missing.' });
+        }
+
         if (!process.env.GOOGLE_CLIENT_ID) {
-            return res.status(500).json({ message: 'Server configuration error.' });
+            console.error('GOOGLE_CLIENT_ID is missing from the server environment.');
+            return res.status(500).json({ message: 'Google authentication is not configured on the server.' });
         }
 
         const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -233,26 +108,38 @@ const googleAuth = async (req, res) => {
             idToken: token,
             audience: process.env.GOOGLE_CLIENT_ID,
         });
-        
-        const { email, name } = ticket.getPayload();
 
-        let user = await User.findOne({ email });
-        
-        if (!user) {
-            const randomPassword = Math.random().toString(36).slice(-10) + "A1!";
-            user = await User.create({ username: name, email, password: randomPassword });
+        const payload = ticket.getPayload();
+        const email = payload?.email?.trim().toLowerCase();
+        const name = payload?.name?.trim() || email?.split('@')[0] || 'Google User';
+
+        if (!email || payload?.email_verified !== true) {
+            return res.status(401).json({ message: 'Google account email could not be verified.' });
         }
 
-        // Returns exactly the same format as your manual login
-        res.status(200).json({
+        let user = await User.findOne({ email });
+
+        if (!user) {
+            // Google users do not use a local password. Generate an unusable random value
+            // so the password field can still satisfy the database model.
+            const randomPassword = `${crypto.randomBytes(32).toString('hex')}A1!`;
+            user = await User.create({
+                username: name,
+                email,
+                password: randomPassword,
+                authProvider: 'google',
+            });
+        }
+
+        return res.status(200).json({
             _id: user._id,
             username: user.username,
             email: user.email,
             token: generateToken(user._id),
         });
     } catch (error) {
-        console.error("GOOGLE AUTH ERROR:", error.message);
-        res.status(401).json({ message: 'Google Authentication failed.' });
+        console.error('Google Authentication Error:', error);
+        return res.status(401).json({ message: 'Google authentication failed.' });
     }
 };
 

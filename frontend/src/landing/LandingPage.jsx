@@ -19,10 +19,7 @@ export const LandingPage = () => {
           </Link>
 
           <div className="hidden md:flex items-center gap-7 text-[13px] font-medium text-slate-600">
-            <a href="#features" className="hover:text-blue-600 transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-blue-600 transition-colors">How it works</a>
-            <a href="#templates" className="hover:text-blue-600 transition-colors">Templates</a>
-            <Link to="/login" className="ml-3 hover:text-blue-600 transition-colors">Sign in</Link>
+            <Link to="/login" className="hover:text-blue-600 transition-colors">Sign in</Link>
             <Link to="/signup" className="px-4 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors shadow-sm">Sign up</Link>
           </div>
 
@@ -32,10 +29,8 @@ export const LandingPage = () => {
         </nav>
         {menuOpen && (
           <div className="md:hidden border-t border-blue-100 bg-white px-5 py-4 space-y-4">
-            <a href="#features" onClick={() => setMenuOpen(false)} className="block text-sm text-slate-600">Features</a>
-            <a href="#how-it-works" onClick={() => setMenuOpen(false)} className="block text-sm text-slate-600">How it works</a>
-            <Link to="/login" className="block text-sm text-slate-600">Sign in</Link>
-            <Link to="/signup" className="block w-full text-center py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold">Sign up</Link>
+            <Link to="/login" onClick={() => setMenuOpen(false)} className="block text-sm text-slate-600">Sign in</Link>
+            <Link to="/signup" onClick={() => setMenuOpen(false)} className="block w-full text-center py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold">Sign up</Link>
           </div>
         )}
       </header>
@@ -76,10 +71,8 @@ export const LandingPage = () => {
             </div>
           </div>
         </section>
-
-        <section id="features" className="border-y border-blue-100 bg-white"><div className="max-w-6xl mx-auto px-5 py-14 lg:py-16"><div className="grid md:grid-cols-3 gap-0 md:divide-x divide-blue-100">{[['01','Start from the job','Use the actual job description as the starting point for your resume.'],['02','Edit without fighting the layout','Keep your information organized while the resume stays clean.'],['03','Download when ready','Review your final resume and export a professional PDF.']].map(([number,title,text]) => (<div key={number} className="px-0 md:px-8 first:pl-0 last:pr-0 py-5 md:py-1"><p className="text-xs font-bold text-blue-600 mb-3">{number}</p><h3 className="text-[17px] font-semibold text-slate-900 mb-2">{title}</h3><p className="text-sm leading-6 text-slate-500">{text}</p></div>))}</div></div></section>
-        <section id="how-it-works" className="max-w-6xl mx-auto px-5 py-16 lg:py-20"><div className="rounded-2xl bg-[#eef5ff] border border-blue-100 px-7 py-9 sm:px-10 sm:py-11 flex flex-col md:flex-row md:items-center md:justify-between gap-7"><div><p className="text-[11px] font-bold tracking-[0.16em] text-blue-600 mb-3">READY WHEN YOU ARE</p><h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">Build the resume for your next application.</h2><p className="mt-2 text-sm sm:text-base text-slate-600">Create your account and start with the job description.</p></div><button onClick={() => navigate('/signup')} className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors">Build my resume <ArrowRight size={17} /></button></div></section>
       </main>
+
       <footer className="border-t border-blue-100 bg-white"><div className="max-w-6xl mx-auto px-5 py-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-slate-400"><span>© {new Date().getFullYear()} haveResume.</span><Link to="/login" className="hover:text-blue-600 transition-colors">Sign in</Link></div></footer>
     </div>
   );

@@ -2,7 +2,6 @@ require('dotenv').config();
 const fs = require('fs');
 const axios = require('axios');
 const PDFParserModule = require('pdf2json');
-const { recordAIUsage } = require('../utils/aiUsage');
 const PDFParser = PDFParserModule.default || PDFParserModule;
 
 const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
@@ -10,12 +9,7 @@ const MODEL_CACHE_TTL = 5 * 60 * 1000;
 let cachedModels = null;
 let cachedModelsAt = 0;
 
-const PREFERRED_MODELS = [
-  'llama-3.1-8b-instant',
-  'openai/gpt-oss-20b',
-  'llama-3.3-70b-versatile',
-  'openai/gpt-oss-120b',
-];
+const PREFERRED_MODELS = ['llama-3.1-8b-instant', 'openai/gpt-oss-20b', 'llama-3.3-70b-versatile', 'openai/gpt-oss-120b'];
 
 const getApiKey = () => {
   const apiKey = process.env.GROQ_API_KEY;
@@ -32,23 +26,17 @@ const isUsableTextModel = (model) => {
   if (!model || model.active === false || !model.id) return false;
   const id = model.id.toLowerCase();
   const owner = String(model.owned_by || '').toLowerCase();
-  const excluded = ['whisper', 'guard', 'tts', 'orpheus', 'safeguard', 'embed'];
-  return !excluded.some((term) => id.includes(term) || owner.includes(term));
+  return !['whisper', 'guard', 'tts', 'orpheus', 'safeguard', 'embed'].some((term) => id.includes(term) || owner.includes(term));
 };
 
 const listAvailableModels = async (forceRefresh = false) => {
   const now = Date.now();
   if (!forceRefresh && cachedModels && now - cachedModelsAt < MODEL_CACHE_TTL) return cachedModels;
-
   const response = await axios.get(`${GROQ_BASE_URL}/models`, {
     headers: { Authorization: `Bearer ${getApiKey()}` },
     timeout: 10000,
   });
-
-  const models = Array.isArray(response.data?.data)
-    ? response.data.data.filter(isUsableTextModel)
-    : [];
-
+  const models = Array.isArray(response.data?.data) ? response.data.data.filter(isUsableTextModel) : [];
   if (!models.length) throw new Error('Groq returned no active text models for this API key.');
   cachedModels = models;
   cachedModelsAt = now;
@@ -60,8 +48,7 @@ const selectModel = async (forceRefresh = false) => {
   const available = new Set(models.map((model) => model.id));
   const configured = getConfiguredModel();
   if (configured && available.has(configured)) return configured;
-  const preferred = PREFERRED_MODELS.find((id) => available.has(id));
-  return preferred || models[0].id;
+  return PREFERRED_MODELS.find((id) => available.has(id)) || models[0].id;
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -83,36 +70,22 @@ const callAI = async (messages, options = {}) => {
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
-      const body = {
-        model,
-        messages,
-        temperature: options.temperature ?? 0.05,
-        max_tokens: options.maxTokens ?? 6000,
-      };
+      const body = { model, messages, temperature: options.temperature ?? 0.05, max_tokens: options.maxTokens ?? 6000 };
       if (options.jsonMode !== false && !jsonModeRetried) body.response_format = { type: 'json_object' };
-
       const response = await axios.post(`${GROQ_BASE_URL}/chat/completions`, body, {
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         timeout: 30000,
       });
-
       const content = response.data?.choices?.[0]?.message?.content;
       if (!content) throw new Error(`Model ${model} returned no content.`);
-
-      return {
-        content,
-        usage: response.data?.usage || null,
-        model: response.data?.model || model,
-      };
+      return { content, usage: response.data?.usage || null, model: response.data?.model || model };
     } catch (error) {
       lastError = error;
       const status = error?.response?.status;
-
       if (status === 400 && options.jsonMode !== false && !jsonModeRetried) {
         jsonModeRetried = true;
         continue;
       }
-
       if ([401, 403, 404, 429].includes(status) || status >= 500) {
         try {
           const refreshed = await listAvailableModels(true);
@@ -126,7 +99,6 @@ const callAI = async (messages, options = {}) => {
           lastError = refreshError;
         }
       }
-
       if ((!status || status === 408 || status === 409 || status >= 500) && attempt < 3) {
         await sleep(750 * Math.pow(2, attempt));
         continue;
@@ -155,13 +127,9 @@ const importResume = async (req, res) => {
     if (!req.file || !req.file.path) return res.status(400).json({ message: 'No valid PDF file uploaded.' });
     filePath = req.file.path;
     const rawText = await extractTextFromPDF(filePath);
-
-    if (!rawText || rawText.trim().length < 50) {
-      return res.status(400).json({ message: 'Could not extract enough text from this PDF.' });
-    }
+    if (!rawText || rawText.trim().length < 50) return res.status(400).json({ message: 'Could not extract enough text from this PDF.' });
 
     const systemInstruction = `You are an expert ATS resume data extraction API. Read raw resume text and map it exactly to the JSON schema.
-
 MANDATORY RULES:
 1. Preserve bullet points in the exact top-to-bottom order from the source.
 2. Extract the full summary and every bullet point without truncation.
@@ -192,24 +160,14 @@ MANDATORY RULES:
     ], { maxTokens: 6000, temperature: 0.05 });
 
     const parsedJSON = extractCleanJSON(aiResult.content);
-
-    // Groq returns exact token counts in response. Persist them per authenticated user/day.
-    await recordAIUsage({ userId: req.user._id, usage: aiResult.usage, model: aiResult.model });
-
     return res.status(200).json({ resumeData: parsedJSON });
   } catch (error) {
-    console.error('Import Error:', {
-      message: error.message,
-      status: error.providerStatus || error.response?.status,
-      providerError: error.response?.data?.error || null,
-    });
+    console.error('Import Error:', { message: error.message, status: error.providerStatus || error.response?.status, providerError: error.response?.data?.error || null });
     return res.status(500).json({ message: 'Failed to process PDF import.', error: error.message });
   } finally {
-    if (filePath) {
-      fs.unlink(filePath, (err) => {
-        if (err && err.code !== 'ENOENT') console.error('Temp PDF cleanup failed:', err.message);
-      });
-    }
+    if (filePath) fs.unlink(filePath, (err) => {
+      if (err && err.code !== 'ENOENT') console.error('Temp PDF cleanup failed:', err.message);
+    });
   }
 };
 

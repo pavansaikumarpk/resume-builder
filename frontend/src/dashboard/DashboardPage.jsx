@@ -62,8 +62,11 @@ export default function DashboardPage() {
         <nav className="max-w-6xl mx-auto h-full px-5 flex items-center justify-between">
           <button onClick={() => navigate('/')} className="flex items-center gap-2 font-bold tracking-tight text-[20px] text-slate-950">
             <span className="w-8 h-8 rounded-[9px] bg-blue-600 text-white flex items-center justify-center"><FileText size={16} /></span>
-            resumn<span className="text-blue-600">.</span>
+            haveResume<span className="text-blue-600">.</span>
           </button>
+          <div className="absolute left-1/2 -translate-x-1/2 hidden sm:block text-sm font-semibold text-slate-700">
+            Welcome back, <span className="text-blue-600">{firstName}</span>
+          </div>
           <div className="flex items-center gap-3 sm:gap-5">
             <a href="https://mail.google.com/mail/?view=cm&fs=1&to=nahg9957@gmail.com&su=Resume%20Builder%20Feedback&body=Hi%2C%0A%0AI%20want%20to%20share%20a%20suggestion%20or%20report%20a%20problem%3A%0A" target="_blank" rel="noreferrer" className="hidden sm:flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors">
               <Mail size={16} /> Contact
@@ -76,7 +79,6 @@ export default function DashboardPage() {
 
       <main className="max-w-6xl mx-auto px-5 py-10 lg:py-14">
         <div className="mb-9">
-          <p className="text-sm font-medium text-blue-600 mb-2">Welcome back, {firstName}</p>
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
             <div>
               <h1 className="text-3xl sm:text-4xl font-bold tracking-[-0.03em] text-slate-950">Your resumes</h1>

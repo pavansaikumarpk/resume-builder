@@ -6,6 +6,7 @@ import DashboardPage from './dashboard/DashboardPage';
 import WorkspacePage from './editor/WorkspacePage';
 import PublicPortfolioPage from './portfolio/PublicPortfolioPage';
 import TemplatesPage from './templates/TemplatesPage';
+import AIUsageBadge from './components/AIUsageBadge';
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -20,38 +21,13 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
 
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/templates"
-          element={
-            <ProtectedRoute>
-              <TemplatesPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/workspace/:id"
-          element={
-            <ProtectedRoute>
-              <WorkspacePage />
-            </ProtectedRoute>
-          }
-        />
-
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
+        <Route path="/workspace/:id" element={<ProtectedRoute><WorkspacePage /></ProtectedRoute>} />
         <Route path="/p/:slug" element={<PublicPortfolioPage />} />
-
-        {/* Fallback route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <AIUsageBadge />
     </BrowserRouter>
   );
 }

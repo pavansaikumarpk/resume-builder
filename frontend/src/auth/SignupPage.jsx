@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '../store/useAuthStore';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Loader2, ArrowRight } from 'lucide-react';
+import { Mail, Lock, User, Loader2, FileText, CheckCircle2 } from 'lucide-react';
 
 const AuthInput = ({ label, icon: Icon, type, value, onChange, minLength }) => (
   <label className="block mb-4">
@@ -15,7 +15,7 @@ const AuthInput = ({ label, icon: Icon, type, value, onChange, minLength }) => (
         onChange={onChange}
         required
         minLength={minLength}
-        className="w-full h-12 bg-white border border-slate-300 rounded-md pl-10 pr-4 text-sm text-slate-800 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/5 transition-all"
+        className="w-full h-12 bg-white border border-slate-200 rounded-lg pl-10 pr-4 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
         placeholder={`Enter your ${label.toLowerCase()}`}
       />
     </div>
@@ -50,26 +50,38 @@ export const SignupPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f7f5] text-slate-900 font-sans">
-      <header className="h-16 bg-white border-b border-slate-200">
+    <div className="min-h-screen bg-[#f5f9ff] text-slate-900 font-sans">
+      <header className="h-[70px] bg-white/95 border-b border-blue-100 sticky top-0 z-20">
         <div className="max-w-6xl mx-auto h-full px-5 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight text-lg">
-            <span className="w-8 h-8 rounded-md bg-slate-900 text-white flex items-center justify-center"><User size={15} /></span>
-            resumn<span className="text-indigo-600">.</span>
+          <Link to="/" className="flex items-center gap-2 font-bold tracking-tight text-[20px] text-slate-950">
+            <span className="w-8 h-8 rounded-[9px] bg-blue-600 text-white flex items-center justify-center"><FileText size={16} /></span>
+            resumn<span className="text-blue-600">.</span>
           </Link>
-          <p className="text-sm text-slate-500">Already have an account? <Link to="/login" className="font-semibold text-slate-900 hover:text-indigo-600">Sign in</Link></p>
+          <p className="text-sm text-slate-500">Already have an account? <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-700">Sign in</Link></p>
         </div>
       </header>
 
-      <main className="max-w-md mx-auto px-5 py-12 sm:py-16">
-        <div className="mb-8">
-          <p className="text-xs font-bold tracking-[0.15em] text-slate-400 mb-3">GET STARTED</p>
-          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-950">Create your account</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-500">Build your resume and keep it ready for your next application.</p>
+      <main className="relative max-w-6xl mx-auto px-5 py-12 lg:py-16 grid lg:grid-cols-[1fr_430px] gap-14 items-center">
+        <div className="absolute -top-20 left-1/4 w-80 h-80 bg-blue-100/60 rounded-full blur-3xl pointer-events-none" />
+        <div className="hidden lg:block relative max-w-xl">
+          <p className="text-[11px] font-bold tracking-[0.18em] text-blue-600 mb-5">START WITH YOUR NEXT JOB</p>
+          <h1 className="text-4xl xl:text-5xl font-bold tracking-[-0.035em] leading-[1.08] text-slate-950">Create your account and build your resume in minutes.</h1>
+          <p className="mt-5 text-lg leading-8 text-slate-600">Paste a job description, add your experience, and turn it into a resume that is ready to apply with.</p>
+          <div className="mt-8 space-y-4 text-sm text-slate-600">
+            {['Clean, professional templates', 'Keep your resumes saved in one place', 'Export your finished resume as a PDF'].map((item) => (
+              <div key={item} className="flex items-center gap-3"><CheckCircle2 size={18} className="text-blue-600 shrink-0" /><span>{item}</span></div>
+            ))}
+          </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-lg p-6 sm:p-7 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
-          {error && <div className="mb-5 p-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-100">{error}</div>}
+        <div className="relative bg-white border border-blue-100 rounded-2xl p-7 sm:p-8 shadow-[0_20px_55px_rgba(37,99,235,0.10)]">
+          <div className="mb-7">
+            <p className="text-[11px] font-bold tracking-[0.16em] text-blue-600 mb-2">GET STARTED</p>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-950">Create your account</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">Your resumes will be saved to your account.</p>
+          </div>
+
+          {error && <div className="mb-5 p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-100">{error}</div>}
 
           <div className="flex justify-center mb-5">
             <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setError('Google Sign-Up failed. Please try again.')} useOneTap={false} width="350" />
@@ -86,10 +98,8 @@ export const SignupPage = () => {
             <AuthInput label="Email address" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <AuthInput label="Password" icon={Lock} type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} />
             <p className="-mt-2 mb-5 text-xs text-slate-400">Use at least 6 characters.</p>
-
-            <button type="submit" disabled={isLoading} className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white rounded-md font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+            <button type="submit" disabled={isLoading} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
               {isLoading ? <Loader2 size={17} className="animate-spin" /> : 'Create account'}
-              {!isLoading && <ArrowRight size={17} />}
             </button>
           </form>
 

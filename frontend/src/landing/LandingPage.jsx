@@ -1,134 +1,146 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Check, FileText, Menu, X } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowRight, Check, FileText, Menu, X, BriefcaseBusiness } from 'lucide-react';
 
 export const LandingPage = () => {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = React.useState(false);
 
   return (
-    <div className="min-h-screen bg-[#f7f7f5] text-[#171717] font-sans">
-      <header className="bg-[#f7f7f5] border-b border-black/10">
-        <nav className="max-w-6xl mx-auto h-[68px] px-5 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 font-semibold tracking-tight text-[19px]">
-            <span className="w-8 h-8 rounded-md bg-[#171717] text-white flex items-center justify-center">
-              <FileText size={15} />
+    <div className="min-h-screen bg-[#f7faff] text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900">
+      <header className="sticky top-0 z-40 border-b border-blue-100/80 bg-white/90 backdrop-blur-xl">
+        <nav className="max-w-6xl mx-auto h-[70px] px-5 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 font-bold tracking-tight text-[20px] text-slate-950">
+            <span className="w-8 h-8 rounded-[9px] bg-blue-600 text-white flex items-center justify-center shadow-sm">
+              <FileText size={16} strokeWidth={2.5} />
             </span>
-            resumn<span className="text-indigo-600">.</span>
+            resumn<span className="text-blue-600">.</span>
           </Link>
 
-          <div className="hidden sm:flex items-center gap-7 text-sm">
-            <a href="#how-it-works" className="text-black/60 hover:text-black transition-colors">How it works</a>
-            <Link to="/login" className="text-black/60 hover:text-black transition-colors">Sign in</Link>
-            <button onClick={() => navigate('/signup')} className="px-4 py-2 rounded-md bg-[#171717] text-white font-medium hover:bg-black transition-colors">
-              Create resume
-            </button>
+          <div className="hidden md:flex items-center gap-7 text-[13px] font-medium text-slate-600">
+            <a href="#features" className="hover:text-blue-600 transition-colors">Features</a>
+            <a href="#how-it-works" className="hover:text-blue-600 transition-colors">How it works</a>
+            <a href="#templates" className="hover:text-blue-600 transition-colors">Templates</a>
+            <Link to="/login" className="ml-3 hover:text-blue-600 transition-colors">Sign in</Link>
+            <Link to="/signup" className="px-4 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors shadow-sm">
+              Sign up
+            </Link>
           </div>
 
-          <button onClick={() => setMenuOpen(!menuOpen)} className="sm:hidden p-2 text-black/60" aria-label="Toggle menu">
-            {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 text-slate-600" aria-label="Toggle menu">
+            {menuOpen ? <X size={21} /> : <Menu size={21} />}
           </button>
         </nav>
         {menuOpen && (
-          <div className="sm:hidden border-t border-black/10 bg-[#f7f7f5] px-5 py-4 space-y-3">
-            <a href="#how-it-works" onClick={() => setMenuOpen(false)} className="block text-sm text-black/60">How it works</a>
-            <Link to="/login" className="block text-sm text-black/60">Sign in</Link>
-            <button onClick={() => navigate('/signup')} className="w-full py-2.5 rounded-md bg-[#171717] text-white text-sm font-medium">Create resume</button>
+          <div className="md:hidden border-t border-blue-100 bg-white px-5 py-4 space-y-4">
+            <a href="#features" onClick={() => setMenuOpen(false)} className="block text-sm text-slate-600">Features</a>
+            <a href="#how-it-works" onClick={() => setMenuOpen(false)} className="block text-sm text-slate-600">How it works</a>
+            <Link to="/login" className="block text-sm text-slate-600">Sign in</Link>
+            <Link to="/signup" className="block w-full text-center py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold">Sign up</Link>
           </div>
         )}
       </header>
 
       <main>
-        <section className="max-w-6xl mx-auto px-5 pt-20 pb-20 lg:pt-28 lg:pb-28">
-          <div className="grid lg:grid-cols-[1fr_0.92fr] gap-14 lg:gap-20 items-center">
-            <div>
-              <p className="text-xs font-bold tracking-[0.16em] text-black/45 mb-6">A SIMPLER WAY TO BUILD YOUR RESUME</p>
-              <h1 className="text-[46px] sm:text-6xl lg:text-[68px] font-semibold tracking-[-0.045em] leading-[1.02] text-[#111]">
-                Paste the job description.<br />
-                <span className="text-black/45">Get your resume in a minute.</span>
-              </h1>
-              <p className="mt-7 max-w-xl text-[17px] leading-8 text-black/60">
-                Start with the role you want, add your experience, and turn it into a clean resume that is ready to apply with.
-              </p>
+        <section className="relative overflow-hidden">
+          <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full bg-blue-100/60 blur-3xl pointer-events-none" />
+          <div className="absolute top-16 -right-40 w-[520px] h-[520px] rounded-full bg-sky-100/70 blur-3xl pointer-events-none" />
 
-              <div className="mt-9 flex flex-col sm:flex-row gap-3">
-                <button onClick={() => navigate('/signup')} className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-[#171717] text-white font-semibold hover:bg-black transition-colors">
-                  Build my resume <ArrowRight size={17} />
-                </button>
-                <Link to="/login" className="inline-flex items-center justify-center px-5 py-3 rounded-md border border-black/15 bg-white text-black/70 font-semibold hover:bg-black/[0.03] transition-colors">
-                  Sign in
-                </Link>
-              </div>
+          <div className="max-w-6xl mx-auto px-5 pt-16 pb-20 lg:pt-24 lg:pb-24 relative">
+            <div className="grid lg:grid-cols-[0.92fr_1.08fr] gap-14 lg:gap-16 items-center">
+              <motion.div initial={{ opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45 }}>
+                <p className="text-[11px] font-bold tracking-[0.18em] text-blue-600 mb-5">BUILD YOUR RESUME FASTER</p>
+                <h1 className="text-[45px] sm:text-6xl lg:text-[64px] font-bold tracking-[-0.045em] leading-[1.04] text-slate-950">
+                  Paste the job description.<br />
+                  <span className="text-blue-600">Get your resume in a minute.</span>
+                </h1>
+                <p className="mt-6 max-w-xl text-[17px] leading-8 text-slate-600">
+                  Start with the job you want. Add your experience once, tailor it to the role, and download a clean resume ready to apply.
+                </p>
 
-              <div className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-sm text-black/50">
-                <span className="flex items-center gap-2"><Check size={14} /> Clean layouts</span>
-                <span className="flex items-center gap-2"><Check size={14} /> ATS-friendly</span>
-                <span className="flex items-center gap-2"><Check size={14} /> PDF export</span>
-              </div>
-            </div>
-
-            <div className="bg-white border border-black/10 shadow-[0_18px_50px_rgba(0,0,0,0.08)] rounded-lg overflow-hidden">
-              <div className="px-5 py-4 border-b border-black/10 flex items-center justify-between">
-                <span className="text-sm font-semibold">Start with a job description</span>
-                <span className="text-xs text-black/35">Example</span>
-              </div>
-              <div className="p-5">
-                <div className="border border-black/10 rounded-md p-4 bg-[#fafafa] min-h-[210px] text-sm leading-6 text-black/55">
-                  <p className="font-semibold text-black/75 mb-2">Backend Developer</p>
-                  <p>We are looking for a developer with experience in Java, Spring Boot, REST APIs, SQL and cloud services.</p>
-                  <p className="mt-3">You will build reliable services, work with a team, and improve existing applications.</p>
+                <div className="mt-8">
+                  <button onClick={() => navigate('/signup')} className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all shadow-[0_8px_24px_rgba(37,99,235,0.22)] hover:-translate-y-0.5">
+                    Build my resume <ArrowRight size={18} />
+                  </button>
                 </div>
-                <div className="mt-4 flex items-center justify-between">
-                  <span className="text-xs text-black/40">Paste your own job description after signing in.</span>
-                  <button onClick={() => navigate('/signup')} className="text-sm font-semibold text-indigo-600 hover:text-indigo-700">Continue →</button>
+
+                <div className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-[13px] text-slate-500">
+                  <span className="flex items-center gap-1.5"><Check size={14} className="text-blue-600" /> ATS-friendly</span>
+                  <span className="flex items-center gap-1.5"><Check size={14} className="text-blue-600" /> Clean templates</span>
+                  <span className="flex items-center gap-1.5"><Check size={14} className="text-blue-600" /> PDF export</span>
                 </div>
-              </div>
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, delay: 0.12 }} className="relative">
+                <div className="absolute -inset-5 bg-blue-200/35 rounded-[28px] blur-2xl" />
+                <div className="relative bg-white border border-blue-100 rounded-2xl shadow-[0_20px_60px_rgba(30,64,175,0.12)] overflow-hidden">
+                  <div className="h-12 px-5 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-800"><BriefcaseBusiness size={16} className="text-blue-600" /> Job description</div>
+                    <span className="text-[11px] text-slate-400">Example</span>
+                  </div>
+                  <div className="p-5">
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-[13px] leading-6 text-slate-600 min-h-[170px]">
+                      <p className="font-semibold text-slate-900 mb-1">Software Engineer</p>
+                      <p>We are looking for a developer with experience in Java, Spring Boot, REST APIs, SQL and cloud services.</p>
+                      <p className="mt-2">Build reliable services, work with the team, and improve existing applications.</p>
+                    </div>
+                    <div className="mt-5 flex items-center gap-4">
+                      <div className="h-10 flex-1 rounded-lg bg-blue-600/10 border border-blue-100 flex items-center px-3">
+                        <span className="text-[12px] text-blue-700 font-medium">Resume generated</span>
+                      </div>
+                      <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm"><ArrowRight size={17} /></div>
+                    </div>
+                  </div>
+                </div>
+
+                <motion.div animate={{ y: [0, -5, 0] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }} className="absolute -bottom-7 -left-7 hidden sm:block bg-white border border-blue-100 rounded-xl shadow-lg p-3 w-52">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600"><FileText size={17} /></div>
+                    <div><p className="text-[11px] font-semibold text-slate-800">Your resume</p><p className="text-[10px] text-slate-400">Ready to download</p></div>
+                  </div>
+                </motion.div>
+              </motion.div>
             </div>
           </div>
         </section>
 
-        <section id="how-it-works" className="border-y border-black/10 bg-white">
-          <div className="max-w-6xl mx-auto px-5 py-16 lg:py-20">
-            <div className="max-w-2xl mb-12">
-              <p className="text-xs font-bold tracking-[0.16em] text-black/40 mb-3">HOW IT WORKS</p>
-              <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight">Less formatting. More applying.</h2>
-            </div>
-            <div className="grid md:grid-cols-3 gap-10">
+        <section id="features" className="border-y border-blue-100 bg-white">
+          <div className="max-w-6xl mx-auto px-5 py-14 lg:py-16">
+            <div className="grid md:grid-cols-3 gap-0 md:divide-x divide-blue-100">
               {[
-                ['01', 'Paste the job description', 'Give us the role you are applying for and start from what the employer is actually asking for.'],
-                ['02', 'Add your experience', 'Keep your work, projects and education in one place and edit them whenever you need.'],
-                ['03', 'Review and apply', 'Make your final changes, download the PDF, and send your application.'],
+                ['01', 'Start from the job', 'Use the actual job description as the starting point for your resume.'],
+                ['02', 'Edit without fighting the layout', 'Keep your information organized while the resume stays clean.'],
+                ['03', 'Download when ready', 'Review your final resume and export a professional PDF.'],
               ].map(([number, title, text]) => (
-                <div key={number} className="border-t border-black/20 pt-5">
-                  <p className="text-xs font-bold text-black/30 mb-4">{number}</p>
-                  <h3 className="text-lg font-semibold mb-2">{title}</h3>
-                  <p className="text-sm leading-6 text-black/55">{text}</p>
+                <div key={number} className="px-0 md:px-8 first:pl-0 last:pr-0 py-5 md:py-1">
+                  <p className="text-xs font-bold text-blue-600 mb-3">{number}</p>
+                  <h3 className="text-[17px] font-semibold text-slate-900 mb-2">{title}</h3>
+                  <p className="text-sm leading-6 text-slate-500">{text}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="max-w-6xl mx-auto px-5 py-16 lg:py-20">
-          <div className="border border-black/10 bg-[#f1f1ee] rounded-lg px-7 py-9 sm:px-10 sm:py-10 flex flex-col md:flex-row md:items-center md:justify-between gap-7">
+        <section id="how-it-works" className="max-w-6xl mx-auto px-5 py-16 lg:py-20">
+          <div className="rounded-2xl bg-[#eef5ff] border border-blue-100 px-7 py-9 sm:px-10 sm:py-11 flex flex-col md:flex-row md:items-center md:justify-between gap-7">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Ready to build yours?</h2>
-              <p className="mt-2 text-sm sm:text-base text-black/55">Create an account and start with the job you want.</p>
+              <p className="text-[11px] font-bold tracking-[0.16em] text-blue-600 mb-3">READY WHEN YOU ARE</p>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">Build the resume for your next application.</h2>
+              <p className="mt-2 text-sm sm:text-base text-slate-600">Create your account and start with the job description.</p>
             </div>
-            <button onClick={() => navigate('/signup')} className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-[#171717] text-white font-semibold hover:bg-black transition-colors">
-              Create resume <ArrowRight size={17} />
+            <button onClick={() => navigate('/signup')} className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors">
+              Build my resume <ArrowRight size={17} />
             </button>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-black/10 bg-white">
-        <div className="max-w-6xl mx-auto px-5 py-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-black/45">
+      <footer className="border-t border-blue-100 bg-white">
+        <div className="max-w-6xl mx-auto px-5 py-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-slate-400">
           <span>© {new Date().getFullYear()} resumn.</span>
-          <div className="flex gap-5">
-            <Link to="/login" className="hover:text-black">Sign in</Link>
-            <Link to="/signup" className="hover:text-black">Create account</Link>
-          </div>
+          <Link to="/login" className="hover:text-blue-600 transition-colors">Sign in</Link>
         </div>
       </footer>
     </div>

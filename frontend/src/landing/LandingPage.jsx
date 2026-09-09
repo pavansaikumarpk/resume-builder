@@ -11,11 +11,13 @@ export const LandingPage = () => {
     <div className="min-h-screen bg-[#f7faff] text-slate-900 font-sans selection:bg-blue-100 selection:text-blue-900">
       <header className="sticky top-0 z-40 border-b border-blue-100/80 bg-white/90 backdrop-blur-xl">
         <nav className="max-w-6xl mx-auto h-[70px] px-5 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 font-bold tracking-tight text-[20px] text-slate-950">
-            <span className="w-8 h-8 rounded-[9px] bg-blue-600 text-white flex items-center justify-center shadow-sm">
-              <FileText size={16} strokeWidth={2.5} />
-            </span>
-            haveResume<span className="text-blue-600">.</span>
+          <Link to="/" className="flex items-center gap-3 font-bold tracking-tight text-[20px] text-slate-950">
+            <img
+              src="/haveResume_logo.png"
+              alt="haveResume"
+              className="w-9 h-9 rounded-[10px] object-contain"
+            />
+            <span>haveResume<span className="text-blue-600">.</span></span>
           </Link>
 
           <div className="hidden md:flex items-center gap-7 text-[13px] font-medium text-slate-600">

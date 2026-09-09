@@ -15,9 +15,9 @@ export const LandingPage = () => {
             <img
               src="/haveResume_logo.png"
               alt="haveResume"
-              className="w-9 h-9 rounded-[10px] object-contain"
+              className="w-10 h-10 object-contain"
             />
-            <span>haveResume<span className="text-blue-600">.</span></span>
+            <span>haveResume</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-7 text-[13px] font-medium text-slate-600">

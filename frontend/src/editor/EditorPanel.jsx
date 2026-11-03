@@ -455,10 +455,24 @@ export const EditorPanel = () => {
   };
 
   const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (file && file.type === 'application/pdf') {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    // Browser MIME values are not always populated consistently. The server
+    // performs the authoritative PDF signature check.
+    const looksLikePdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (!looksLikePdf) {
+      alert('Please select a PDF file.');
+      input.value = '';
+      return;
+    }
+
+    try {
       await importResumeFromPdf(file);
-      e.target.value = null;
+    } finally {
+      // Allow the same file to be selected again after either success or failure.
+      input.value = '';
     }
   };
 

@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
+const mongoose = require('mongoose');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 
@@ -19,7 +20,6 @@ const usageRoutes = require('./routes/usage-routes');
 
 const app = express();
 app.set('trust proxy', 1);
-connectDB();
 
 const allowedOrigins = new Set([
   'https://haveresume.com',
@@ -53,6 +53,10 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(cookieParser());
 
+app.get('/api/health', (req, res) => {
+  const databaseReady = mongoose.connection.readyState === 1;
+  res.status(databaseReady ? 200 : 503).json({ status: databaseReady ? 'ok' : 'unavailable', database: databaseReady ? 'connected' : 'disconnected' });
+});
 app.get('/api/test', (req, res) => res.send('Resumn API is live.'));
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/resume', editorLimiter, resumeRoutes);
@@ -65,4 +69,18 @@ app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => console.log(`Resumn API running on port ${PORT}`));
+
+const startServer = async () => {
+  try {
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+      throw new Error('JWT_SECRET must be configured with at least 32 characters.');
+    }
+    await connectDB();
+    app.listen(PORT, () => console.log(`Resumn API running on port ${PORT}`));
+  } catch (error) {
+    console.error('API startup failed:', error.message);
+    process.exit(1);
+  }
+};
+
+startServer();

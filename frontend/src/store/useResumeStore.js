@@ -544,7 +544,7 @@ export const useResumeStore = create((set, get) => ({
       const formData = new FormData();
       formData.append('resumeFile', file);
       const { data } = await api.post('/import', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        // Browser sets the multipart boundary for FormData automatically.
       });
       if (!data.resumeData) throw new Error('The PDF importer returned no resume data.');
       const imported = data.resumeData;

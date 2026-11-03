@@ -26,7 +26,7 @@ const getAIConfig = () => {
   } else if (process.env.GROQ_API_KEY) {
     apiKey = process.env.GROQ_API_KEY;
     defaultBaseUrl = 'https://api.groq.com/openai/v1/chat/completions';
-    defaultModel = 'llama-3.3-70b-versatile';
+    defaultModel = 'openai/gpt-oss-120b';
   } else if (process.env.OPENAI_API_KEY) {
     apiKey = process.env.OPENAI_API_KEY;
     defaultBaseUrl = 'https://api.openai.com/v1/chat/completions';

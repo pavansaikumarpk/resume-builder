@@ -559,11 +559,13 @@ export const EditorPanel = () => {
                       <ModernInput
                         label="Full Name"
                         icon={User}
-                        value={[resumeData.personalInfo?.firstName, resumeData.personalInfo?.lastName].filter(Boolean).join(' ')}
+                        value={resumeData.personalInfo?.name || [resumeData.personalInfo?.firstName, resumeData.personalInfo?.lastName].filter(Boolean).join(' ')}
                         onChange={(e) => {
-                          const parts = e.target.value.trim().split(/\s+/).filter(Boolean);
+                          const fullName = e.target.value.trim();
+                          const parts = fullName.split(/\s+/).filter(Boolean);
                           handleUpdate('personalInfo', {
                             ...resumeData.personalInfo,
+                            name: fullName,
                             firstName: parts.shift() || '',
                             lastName: parts.join(' ')
                           });

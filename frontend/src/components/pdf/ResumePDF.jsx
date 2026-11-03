@@ -195,7 +195,22 @@
 //                     </View>
 //                 );
 
-//                 if (section.key === 'skills' && data.skills?.length > 0) return (
+//                 if (section.key === 'certifications' && data.certifications?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.certifications.map((certification, i) => (
+                            <View key={i} style={styles.row}>
+                                <Text style={styles.bulletText}>
+                                    <Text style={styles.bold}>{certification.name}</Text>
+                                    {certification.issuer ? ' — ' + certification.issuer : ''}
+                                </Text>
+                                <Text style={styles.bulletText}>{certification.date || ''}</Text>
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'skills' && data.skills?.length > 0) return (
 //                     <View key={idx} style={styles.sectionBlock}>
 //                         <Text style={styles.sectionTitle}>{section.title}</Text>
 //                         <View style={{ paddingLeft: 4 }}>
@@ -381,7 +396,22 @@
 //                     </View>
 //                 );
 
-//                 if (section.key === 'skills' && data.skills?.length > 0) return (
+//                 if (section.key === 'certifications' && data.certifications?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.certifications.map((certification, i) => (
+                            <View key={i} style={styles.row}>
+                                <Text style={styles.bulletText}>
+                                    <Text style={styles.bold}>{certification.name}</Text>
+                                    {certification.issuer ? ' — ' + certification.issuer : ''}
+                                </Text>
+                                <Text style={styles.bulletText}>{certification.date || ''}</Text>
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'skills' && data.skills?.length > 0) return (
 //                     <View key={idx}>
 //                         <Text style={styles.sectionTitle}>{section.title}</Text>
 //                         <View style={{ paddingLeft: 4 }}>
@@ -558,7 +588,22 @@
 //                     </View>
 //                 );
 
-//                 if (section.key === 'skills' && data.skills?.length > 0) return (
+//                 if (section.key === 'certifications' && data.certifications?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.certifications.map((certification, i) => (
+                            <View key={i} style={styles.row}>
+                                <Text style={styles.bulletText}>
+                                    <Text style={styles.bold}>{certification.name}</Text>
+                                    {certification.issuer ? ' — ' + certification.issuer : ''}
+                                </Text>
+                                <Text style={styles.bulletText}>{certification.date || ''}</Text>
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'skills' && data.skills?.length > 0) return (
 //                     <View key={idx} style={styles.sectionBlock}>
 //                         <Text style={styles.sectionTitle}>{section.title}</Text>
 //                         <View style={{ paddingLeft: 4 }}>
@@ -851,6 +896,21 @@ const HarvardTemplate = ({ data, config }) => {
                     </View>
                 );
 
+                if (section.key === 'certifications' && data.certifications?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.certifications.map((certification, i) => (
+                            <View key={i} style={styles.row}>
+                                <Text style={styles.bulletText}>
+                                    <Text style={styles.bold}>{certification.name}</Text>
+                                    {certification.issuer ? ' — ' + certification.issuer : ''}
+                                </Text>
+                                <Text style={styles.bulletText}>{certification.date || ''}</Text>
+                            </View>
+                        ))}
+                    </View>
+                );
+
                 if (section.key === 'skills' && data.skills?.length > 0) return (
                     <View key={idx} style={styles.sectionBlock}>
                         <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -1037,6 +1097,21 @@ const JakesTemplate = ({ data, config }) => {
                     </View>
                 );
 
+                if (section.key === 'certifications' && data.certifications?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.certifications.map((certification, i) => (
+                            <View key={i} style={styles.row}>
+                                <Text style={styles.bulletText}>
+                                    <Text style={styles.bold}>{certification.name}</Text>
+                                    {certification.issuer ? ' — ' + certification.issuer : ''}
+                                </Text>
+                                <Text style={styles.bulletText}>{certification.date || ''}</Text>
+                            </View>
+                        ))}
+                    </View>
+                );
+
                 if (section.key === 'skills' && data.skills?.length > 0) return (
                     <View key={idx}>
                         <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -1209,6 +1284,21 @@ const LatexTemplate = ({ data, config }) => {
                                         <Text style={styles.bulletText}>{d}</Text>
                                     </View>
                                 ))}
+                            </View>
+                        ))}
+                    </View>
+                );
+
+                if (section.key === 'certifications' && data.certifications?.length > 0) return (
+                    <View key={idx} style={styles.sectionBlock}>
+                        <Text style={styles.sectionTitle}>{section.title}</Text>
+                        {data.certifications.map((certification, i) => (
+                            <View key={i} style={styles.row}>
+                                <Text style={styles.bulletText}>
+                                    <Text style={styles.bold}>{certification.name}</Text>
+                                    {certification.issuer ? ' — ' + certification.issuer : ''}
+                                </Text>
+                                <Text style={styles.bulletText}>{certification.date || ''}</Text>
                             </View>
                         ))}
                     </View>

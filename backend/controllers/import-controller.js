@@ -91,13 +91,13 @@ const normalizeLegacyImportedSections = (resume) => {
   resume.customSections = sections.map((section) => {
     const title = String(section.title || '').trim().toLowerCase();
     if (title !== 'original imported content' && title !== 'imported content') return section;
-    const lines = String(section.text || '').split(/\\r?\\n/);
+    const lines = String(section.text || '').split(/\r?\n/);
     const cleanedLines = lines.filter((line) => line.trim().toLowerCase() !== 'activities');
     const hasActivitiesHeading = lines.some((line) => line.trim().toLowerCase() === 'activities');
     return {
       ...section,
       title: hasActivitiesHeading ? 'Activities' : 'Additional Information',
-      text: cleanedLines.join('\\n').trim()
+      text: cleanedLines.join('\n').trim()
     };
   }).filter((section) => section.text || (section.items || []).length);
 };
@@ -162,7 +162,8 @@ const parseResumeWithAI = async (sourceLines) => {
       text: str(section.text), items: strings(section.items)
     })).filter((section) => section.text || section.items.length)
   };
-  normalizeLegacyImportedSections(resume);\n  return { resume, unmatchedLineCount: null };
+  normalizeLegacyImportedSections(resume);
+  return { resume, unmatchedLineCount: null };
 };
 
 const importResume = async (req, res) => {

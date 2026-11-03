@@ -554,7 +554,8 @@ export const useResumeStore = create((set, get) => ({
         { key: 'experience', title: 'Experience', isCustom: false },
         { key: 'education', title: 'Education', isCustom: false },
         { key: 'projects', title: 'Projects', isCustom: false },
-        { key: 'skills', title: 'Skills', isCustom: false }
+        { key: 'skills', title: 'Skills', isCustom: false },
+        { key: 'certifications', title: 'Certifications', isCustom: false }
       ];
       const customDataPayload = {};
       const customSections = (Array.isArray(imported.customSections) ? imported.customSections : [])

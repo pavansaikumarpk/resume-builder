@@ -1,4 +1,5 @@
 const fs = require('fs');
+const crypto = require('crypto');
 const axios = require('axios');
 const PDFParserModule = require('pdf2json');
 const PDFParser = PDFParserModule.default || PDFParserModule;
@@ -115,7 +116,7 @@ STRICT SOURCE-ONLY RULES:
       date: asString(item.date)
     })),
     customSections: asArray(parsed.customSections).map((section) => ({
-      title: asString(section.title) || 'Additional Information',
+      title: asString(section.title),
       text: asString(section.text),
       items: cleanList(section.items)
     })).filter((section) => section.text || section.items.length)
@@ -124,42 +125,110 @@ STRICT SOURCE-ONLY RULES:
 
 const importResume = async (req, res) => {
   let filePath = null;
+  const requestId = crypto.randomUUID();
+  let stage = 'validation';
+
   try {
     if (!req.file || !req.file.path) {
-      return res.status(400).json({ message: 'No valid PDF file uploaded.' });
+      return res.status(400).json({ code: 'PDF_FILE_REQUIRED', message: 'Choose a PDF file to import.', requestId });
     }
 
     filePath = req.file.path;
+    stage = 'pdf_text_extraction';
     const rawText = await extractTextFromPDF(filePath);
-    if (!rawText || rawText.trim().length < 40) {
+    const normalizedText = typeof rawText === 'string' ? rawText.replace(/\\u0000/g, '').trim() : '';
+
+    if (normalizedText.length < 40) {
       return res.status(422).json({
-        message: 'This PDF has no usable text layer. It may be scanned or image-based; OCR is required before it can be imported.'
+        code: 'PDF_TEXT_NOT_FOUND',
+        message: 'This PDF does not contain enough extractable text. It may be scanned or image-based; OCR is required.',
+        requestId
       });
     }
 
-    const resumeData = await parseResumeWithAI(rawText);
-    // Retain the original parser output so users can compare and recover source wording.
-    resumeData.importedText = rawText;
-    resumeData.importSource = {
-      parser: 'pdf2json+llm',
-      parsedAt: new Date().toISOString(),
-      sourceCharacters: rawText.length,
-      wasTruncatedForAI: rawText.length > 45000
-    };
+    stage = 'ai_structuring';
+    try {
+      const resumeData = await parseResumeWithAI(normalizedText);
+      const hasStructuredContent = Boolean(
+        resumeData.personalInfo.email || resumeData.personalInfo.firstName ||
+        resumeData.summary || resumeData.experience.length || resumeData.education.length ||
+        resumeData.projects.length || resumeData.skills.length || resumeData.certifications.length ||
+        resumeData.customSections.length
+      );
 
-    return res.status(200).json({ resumeData });
+      if (!hasStructuredContent) {
+        throw new Error('AI response contained no recognizable resume fields.');
+      }
+
+      resumeData.importedText = normalizedText;
+      resumeData.importSource = {
+        parser: 'pdf2json+llm',
+        parsedAt: new Date().toISOString(),
+        sourceCharacters: normalizedText.length,
+        wasTruncatedForAI: normalizedText.length > 45000,
+        structured: true
+      };
+
+      return res.status(200).json({ resumeData, requestId, warning: null });
+    } catch (aiError) {
+      // Preserve the source document content even when the AI provider is unavailable
+      // or cannot structure this particular layout. Never silently discard an upload.
+      console.error('[resume-import] structuring fallback', {
+        requestId,
+        stage,
+        providerStatus: aiError.response?.status || null,
+        error: aiError.message
+      });
+
+      const fallbackData = {
+        personalInfo: { firstName: '', lastName: '', email: '', phone: '', linkedin: '', github: '', location: '' },
+        summary: '',
+        experience: [],
+        education: [],
+        projects: [],
+        skills: [],
+        certifications: [],
+        customSections: [{ title: 'Imported Content', text: normalizedText, items: [] }],
+        importedText: normalizedText,
+        importSource: {
+          parser: 'pdf2json-raw-fallback',
+          parsedAt: new Date().toISOString(),
+          sourceCharacters: normalizedText.length,
+          wasTruncatedForAI: false,
+          structured: false
+        }
+      };
+
+      return res.status(200).json({
+        resumeData: fallbackData,
+        requestId,
+        warning: 'The PDF text was imported, but automatic section detection was unavailable. Your original extracted content has been preserved in Imported Content.'
+      });
+    }
   } catch (error) {
-    console.error('Resume import failed:', error.message);
-    const status = error.response?.status === 429 ? 503 : 422;
+    console.error('[resume-import] failed', {
+      requestId,
+      stage,
+      error: error.message,
+      providerStatus: error.response?.status || null,
+      providerCode: error.code || null
+    });
+
+    const extractionFailure = stage === 'pdf_text_extraction';
+    const status = extractionFailure ? 422 : 500;
     return res.status(status).json({
-      message: error.message.includes('credentials') 
-        ? 'Resume AI import is not configured. Add a valid AI provider API key.'
-        : 'Could not reliably structure this PDF. Try a text-based PDF or a clearer copy.'
+      code: extractionFailure ? 'PDF_EXTRACTION_FAILED' : 'RESUME_IMPORT_FAILED',
+      message: extractionFailure
+        ? 'We could not read this PDF. Try exporting it again as a text-based PDF.'
+        : 'The resume could not be imported right now. Please try again. If the problem continues, contact support with the reference ID.',
+      requestId
     });
   } finally {
     if (filePath) {
       fs.unlink(filePath, (err) => {
-        if (err && err.code !== 'ENOENT') console.error('Temporary PDF cleanup failed:', err.message);
+        if (err && err.code !== 'ENOENT') {
+          console.error('[resume-import] temporary file cleanup failed', { requestId, error: err.message });
+        }
       });
     }
   }

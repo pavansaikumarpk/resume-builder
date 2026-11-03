@@ -136,7 +136,7 @@ const importResume = async (req, res) => {
     filePath = req.file.path;
     stage = 'pdf_text_extraction';
     const rawText = await extractTextFromPDF(filePath);
-    const normalizedText = typeof rawText === 'string' ? rawText.replace(/\\u0000/g, '').trim() : '';
+    const normalizedText = typeof rawText === 'string' ? rawText.replace(/\u0000/g, '').trim() : '';
 
     if (normalizedText.length < 40) {
       return res.status(422).json({

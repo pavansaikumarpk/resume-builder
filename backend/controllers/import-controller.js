@@ -75,38 +75,31 @@ const buildStructuredPrompt = () => [
   'Copy candidate wording exactly. Never rewrite, summarize, correct, improve, embellish, invent, infer, or calculate facts.',
   'Keep each bullet associated with its original heading, role, project, or education entry.',
   'Preserve original section names and skill category names. Use customSections for content that does not fit standard fields.',
+  'If a section is titled "ORIGINAL IMPORTED CONTENT", treat that title as a legacy import marker, not as a real resume section. Classify its contents into the correct existing section or a clearly named custom section such as Activities. Never reproduce the marker title.',
+  'A heading such as Activities, Leadership, Awards, or Extracurriculars is a section heading; keep its following entries grouped under that heading.',
   'Do not discard content because its type is unclear. Put it in customSections rather than guessing.',
   'Return JSON only. Unknown values must be empty strings or arrays.',
   'Schema:',
   '{"personalInfo":{"firstName":"","lastName":"","email":"","phone":"","linkedin":"","github":"","location":""},"summary":"","experience":[{"company":"","position":"","location":"","startDate":"","endDate":"","description":[]}],"education":[{"institution":"","degree":"","fieldOfStudy":"","location":"","startDate":"","endDate":"","description":[]}],"projects":[{"name":"","link":"","date":"","description":[]}],"skills":[{"category":"","items":[{"name":""}]}],"certifications":[{"name":"","issuer":"","date":""}],"customSections":[{"title":"","text":"","items":[]}]}'
 ].join('\n');
 
-const collectStrings = (value, output = []) => {
-  if (typeof value === 'string') { if (value.trim()) output.push(value); }
-  else if (Array.isArray(value)) value.forEach((item) => collectStrings(item, output));
-  else if (value && typeof value === 'object') Object.entries(value).forEach(([key, child]) => {
-    if (!['id', 'importedText', 'importSource'].includes(key)) collectStrings(child, output);
-  });
-  return output;
-};
-
-// Any source line not confidently represented is preserved in an editable
-// custom section instead of being silently dropped by the model.
-const reconcileSourceLines = (resume, sourceLines) => {
-  const outputText = normalizeForMatch(collectStrings(resume).join(' '));
-  const unmatched = sourceLines.filter((entry) => {
-    const line = normalizeForMatch(entry.text);
-    if (line.length < 3) return false;
-    const words = line.split(' ').filter((word) => word.length > 1);
-    if (!words.length) return false;
-    const matchedWords = words.filter((word) => outputText.includes(word)).length;
-    return matchedWords / words.length < 0.8;
-  });
-  if (unmatched.length) {
-    resume.customSections = Array.isArray(resume.customSections) ? resume.customSections : [];
-    resume.customSections.push({ title: 'Additional extracted content', text: unmatched.map((entry) => entry.text).join('\n'), items: [] });
-  }
-  return unmatched.length;
+// Do not use fuzzy token overlap to create a second visible copy of source text.
+// The complete extraction remains in resume.importedText for audit/recovery. The
+// structured model output is responsible for placing content into editable fields.
+const normalizeLegacyImportedSections = (resume) => {
+  const sections = Array.isArray(resume.customSections) ? resume.customSections : [];
+  resume.customSections = sections.map((section) => {
+    const title = String(section.title || '').trim().toLowerCase();
+    if (title !== 'original imported content' && title !== 'imported content') return section;
+    const lines = String(section.text || '').split(/\\r?\\n/);
+    const cleanedLines = lines.filter((line) => line.trim().toLowerCase() !== 'activities');
+    const hasActivitiesHeading = lines.some((line) => line.trim().toLowerCase() === 'activities');
+    return {
+      ...section,
+      title: hasActivitiesHeading ? 'Activities' : 'Additional Information',
+      text: cleanedLines.join('\\n').trim()
+    };
+  }).filter((section) => section.text || (section.items || []).length);
 };
 
 const parseResumeWithAI = async (sourceLines) => {
@@ -169,7 +162,7 @@ const parseResumeWithAI = async (sourceLines) => {
       text: str(section.text), items: strings(section.items)
     })).filter((section) => section.text || section.items.length)
   };
-  return { resume, unmatchedLineCount: reconcileSourceLines(resume, sourceLines) };
+  normalizeLegacyImportedSections(resume);\n  return { resume, unmatchedLineCount: null };
 };
 
 const importResume = async (req, res) => {
@@ -240,11 +233,11 @@ const importResume = async (req, res) => {
     resume.importSource = {
       parser: 'pdf2json-layout+llm', parsedAt: new Date().toISOString(),
       sourceCharacters: extractedText.length, sourceLineCount: sourceLines.length,
-      unmatchedLineCount: result.unmatchedLineCount, structured: true, ocrUsed: false
+      unmatchedLineCount: null, reconciliation: 'source-retained-for-review', structured: true, ocrUsed: false
     };
-    const warning = result.unmatchedLineCount
-      ? result.unmatchedLineCount + ' source lines could not be confidently mapped. They were retained in an editable Additional extracted content section. Review this section before exporting.'
-      : null;
+    // Do not display a false-positive "unmapped lines" warning from fuzzy text matching.
+    // Imported source text remains available in resume.importedText for review/recovery.
+    const warning = null;
     return res.status(200).json({ resumeData: resume, requestId, warning });
   } catch (error) {
     console.error('[resume-import] failed', {

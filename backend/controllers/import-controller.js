@@ -203,7 +203,29 @@ const importResume = async (req, res) => {
     });
 
     stage = 'ai_structuring';
-    const result = await parseResumeWithAI(sourceLines);
+    let result;
+    try {
+      result = await parseResumeWithAI(sourceLines);
+    } catch (aiError) {
+      console.error('[resume-import] AI structuring unavailable; preserving extracted text', {
+        requestId, code: aiError.code || null, error: aiError.message
+      });
+      const fallbackData = {
+        personalInfo: { firstName: '', lastName: '', email: '', phone: '', linkedin: '', github: '', location: '' },
+        summary: '', experience: [], education: [], projects: [], skills: [], certifications: [],
+        customSections: [{ title: 'Imported PDF text — review and organize', text: extractedText, items: [] }],
+        importedText: extractedText,
+        importSource: {
+          parser: 'pdf2json-layout-fallback', parsedAt: new Date().toISOString(),
+          sourceCharacters: extractedText.length, sourceLineCount: sourceLines.length,
+          unmatchedLineCount: sourceLines.length, structured: false, ocrUsed: false
+        }
+      };
+      return res.status(200).json({
+        resumeData: fallbackData, requestId,
+        warning: 'Automatic structuring was unavailable. Your extracted PDF text is preserved in an editable section, but it has not been mapped into resume fields. Review it before exporting.'
+      });
+    }
     const resume = result.resume;
     const hasContent = Boolean(
       resume.personalInfo.firstName || resume.personalInfo.email || resume.summary ||

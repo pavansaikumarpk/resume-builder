@@ -12,11 +12,34 @@ const extractTextFromPDF = (filePath) => new Promise((resolve, reject) => {
 });
 
 const getAIConfig = () => {
-  const apiKey = process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
-  const baseUrl = process.env.AI_BASE_URL || 'https://api.groq.com/openai/v1/chat/completions';
-  const model = process.env.AI_MODEL_NAME || 'llama-3.3-70b-versatile';
-  if (!apiKey) throw new Error('AI provider credentials are not configured.');
-  return { apiKey, baseUrl, model };
+  // Pair each credential with its own provider endpoint. An explicitly
+  // configured endpoint takes precedence for custom OpenAI-compatible APIs.
+  const explicitBaseUrl = process.env.AI_BASE_URL;
+  let apiKey;
+  let defaultBaseUrl;
+  let defaultModel;
+
+  if (process.env.OPENROUTER_API_KEY) {
+    apiKey = process.env.OPENROUTER_API_KEY;
+    defaultBaseUrl = 'https://openrouter.ai/api/v1/chat/completions';
+    defaultModel = 'meta-llama/llama-3.3-70b-instruct';
+  } else if (process.env.GROQ_API_KEY) {
+    apiKey = process.env.GROQ_API_KEY;
+    defaultBaseUrl = 'https://api.groq.com/openai/v1/chat/completions';
+    defaultModel = 'llama-3.3-70b-versatile';
+  } else if (process.env.OPENAI_API_KEY) {
+    apiKey = process.env.OPENAI_API_KEY;
+    defaultBaseUrl = 'https://api.openai.com/v1/chat/completions';
+    defaultModel = 'gpt-4o-mini';
+  } else {
+    throw new Error('AI provider credentials are not configured.');
+  }
+
+  return {
+    apiKey,
+    baseUrl: explicitBaseUrl || defaultBaseUrl,
+    model: process.env.AI_MODEL_NAME || defaultModel
+  };
 };
 
 const parseResumeWithAI = async (rawText) => {
@@ -55,7 +78,7 @@ STRICT SOURCE-ONLY RULES:
     ]
   }, {
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    timeout: 60000
+    timeout: 90000
   });
 
   const output = response.data?.choices?.[0]?.message?.content;
@@ -177,6 +200,8 @@ const importResume = async (req, res) => {
         requestId,
         stage,
         providerStatus: aiError.response?.status || null,
+        providerCode: aiError.code || null,
+        providerMessage: aiError.response?.data?.error?.message || aiError.response?.data?.message || null,
         error: aiError.message
       });
 

@@ -595,7 +595,7 @@ export const useResumeStore = create((set, get) => ({
         sections: dynamicSections,
         ...(imported.importedText ? { importedText: imported.importedText } : {})
       };
-      updateResumeData(freshResumeData);
+      get().updateResumeData(freshResumeData);
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Failed to import resume. Please check the file and try again.');
     } finally {

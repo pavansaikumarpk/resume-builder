@@ -98,7 +98,9 @@ const reconcileSourceLines = (resume, sourceLines) => {
     const line = normalizeForMatch(entry.text);
     if (line.length < 3) return false;
     const words = line.split(' ').filter((word) => word.length > 1);
-    return words.length && !words.every((word) => outputText.includes(word));
+    if (!words.length) return false;
+    const matchedWords = words.filter((word) => outputText.includes(word)).length;
+    return matchedWords / words.length < 0.8;
   });
   if (unmatched.length) {
     resume.customSections = Array.isArray(resume.customSections) ? resume.customSections : [];

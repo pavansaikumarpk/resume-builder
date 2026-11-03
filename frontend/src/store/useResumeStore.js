@@ -849,21 +849,28 @@ export const useResumeStore = create((set, get) => ({
     updateResumeData({ ...activeResume.resumeData, skills: [...currentSkills, { id: uuidv4(), category: categoryName, items: [] }] });
   },
 
-  addSkillToCategory: (categoryId, skillName) => {
+  addSkillToCategory: (categoryId, skillName, categoryName) => {
     const { activeResume, updateResumeData } = get();
-    if (!activeResume) return;
+    if (!activeResume || !skillName?.trim()) return;
     const currentSkills = activeResume.resumeData.skills || [];
+    const normalizedName = skillName.trim();
     const categoryIndex = currentSkills.findIndex((category) =>
-      category.id === categoryId || category.category?.toLowerCase() === String(categoryId || '').toLowerCase()
+      (categoryId && category.id === categoryId) ||
+      (categoryName && category.category?.trim().toLowerCase() === categoryName.trim().toLowerCase())
     );
-    const updatedSkills = currentSkills.map((category) => ({ ...category, items: [...(category.items || [])] }));
+    const updatedSkills = currentSkills.map((category) => ({
+      ...category,
+      items: Array.isArray(category.items) ? [...category.items] : []
+    }));
     if (categoryIndex >= 0) {
-      const exists = updatedSkills[categoryIndex].items.some((item) =>
-        (typeof item === 'string' ? item : item.name)?.toLowerCase() === skillName.toLowerCase()
+      const target = updatedSkills[categoryIndex];
+      const exists = target.items.some((item) =>
+        (typeof item === 'string' ? item : item?.name)?.trim().toLowerCase() === normalizedName.toLowerCase()
       );
-      if (!exists) updatedSkills[categoryIndex].items.push({ id: uuidv4(), name: skillName });
+      if (!exists) target.items.push({ id: uuidv4(), name: normalizedName });
     } else {
-      updatedSkills.push({ id: uuidv4(), category: String(categoryId || 'General'), items: [{ id: uuidv4(), name: skillName }] });
+      if (!categoryName?.trim()) return;
+      updatedSkills.push({ id: uuidv4(), category: categoryName.trim(), items: [{ id: uuidv4(), name: normalizedName }] });
     }
     updateResumeData({ ...activeResume.resumeData, skills: updatedSkills });
   },
@@ -887,17 +894,24 @@ export const useResumeStore = create((set, get) => ({
     const { activeResume, updateResumeData } = get();
     if (!activeResume) return;
     const currentSkills = activeResume.resumeData.skills || [];
-    const updatedSkills = currentSkills.map((category) => {
-      const matchesCategory = category.id === categoryId || category.category === categoryName;
-      if (!matchesCategory) return category;
-      return {
-        ...category,
-        items: (category.items || []).filter((item) => {
-          if (typeof item === 'string') return item !== skillName;
-          return item.id !== skillId;
-        })
-      };
-    });
+    const updatedSkills = currentSkills
+      .map((category) => {
+        const matchesCategory =
+          (categoryId && category.id === categoryId) ||
+          (categoryName && category.category?.trim().toLowerCase() === categoryName.trim().toLowerCase());
+        if (!matchesCategory) return category;
+        return {
+          ...category,
+          items: (category.items || []).filter((item) => {
+            if (typeof item === 'string') {
+              return item.trim().toLowerCase() !== (skillName || '').trim().toLowerCase();
+            }
+            if (skillId && item?.id === skillId) return false;
+            return (item?.name || '').trim().toLowerCase() !== (skillName || '').trim().toLowerCase();
+          })
+        };
+      })
+      .filter((category) => Array.isArray(category.items) && category.items.length > 0);
     updateResumeData({ ...activeResume.resumeData, skills: updatedSkills });
   },
 

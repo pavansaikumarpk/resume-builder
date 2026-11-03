@@ -12,6 +12,7 @@ const resumeSchema = mongoose.Schema(
 
         templateName: { type: String, required: true, default: 'jakes-resume' },
         resumeData: { type: Object, required: true },
+        documentStyle: { type: Object, default: () => ({ fontFamily: 'Times-Roman', fontSize: 10, lineSpacing: 'tight', margins: 'standard' }) },
     },
     { timestamps: true }
 );

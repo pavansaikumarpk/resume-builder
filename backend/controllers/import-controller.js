@@ -67,6 +67,12 @@ STRICT SOURCE-ONLY RULES:
   "customSections":[{"title":"","text":"","items":[]}]
 }`;
 
+  console.info('[resume-import] AI provider selected', {
+    provider: process.env.OPENROUTER_API_KEY ? 'openrouter' : (process.env.GROQ_API_KEY ? 'groq' : 'openai'),
+    endpoint: baseUrl,
+    model
+  });
+
   const response = await axios.post(baseUrl, {
     model,
     temperature: 0,

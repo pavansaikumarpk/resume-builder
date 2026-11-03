@@ -144,11 +144,13 @@ export const SkillsEditor = () => {
     }
   };
 
-  const handleAddSkill = (categoryId, e) => {
-    if (e.key === 'Enter' && newSkillInputs[categoryId]?.trim()) {
+  const handleAddSkill = (category, e) => {
+    const categoryKey = category.id || category.category;
+    const skillName = newSkillInputs[categoryKey]?.trim();
+    if (e.key === 'Enter' && skillName) {
       e.preventDefault();
-      addSkillToCategory(categoryId, newSkillInputs[categoryId].trim());
-      setNewSkillInputs(prev => ({ ...prev, [categoryId]: '' }));
+      addSkillToCategory(category.id || null, skillName, category.category);
+      setNewSkillInputs(prev => ({ ...prev, [categoryKey]: '' }));
     }
   };
 
@@ -186,7 +188,7 @@ export const SkillsEditor = () => {
               {cat.items?.map((skill, skillIdx) => (
                 <span key={skill.id || `skill-${skillIdx}`} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#e0f2fe] text-sky-700 border border-sky-100 rounded-lg text-xs font-bold">
                   {skill.name}
-                  <button type="button" onClick={() => removeSkillFromCategory(cat.id, skill.id)} className="text-sky-400 hover:text-sky-600 transition-colors">
+                  <button type="button" onClick={() => removeSkillFromCategory(cat.id || null, skill.id || null, cat.category, skill.name)} className="text-sky-400 hover:text-sky-600 transition-colors">
                     <X size={12} />
                   </button>
                 </span>
@@ -196,9 +198,9 @@ export const SkillsEditor = () => {
             <input
               type="text"
               placeholder={`Add to ${cat.category || 'Skills'}...`}
-              value={newSkillInputs[cat.id] || ''}
-              onChange={(e) => setNewSkillInputs(prev => ({ ...prev, [cat.id]: e.target.value }))}
-              onKeyDown={(e) => handleAddSkill(cat.id, e)}
+              value={newSkillInputs[cat.id || cat.category] || ''}
+              onChange={(e) => setNewSkillInputs(prev => ({ ...prev, [cat.id || cat.category]: e.target.value }))}
+              onKeyDown={(e) => handleAddSkill(cat, e)}
               className="w-full bg-[#fafafa] border border-zinc-200 rounded-lg py-2 px-3 text-xs font-medium text-zinc-900 outline-none focus:bg-white focus:border-zinc-300 transition-all shadow-inner placeholder:text-zinc-400"
             />
           </div>

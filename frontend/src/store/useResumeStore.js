@@ -566,21 +566,9 @@ export const useResumeStore = create((set, get) => ({
         .filter((section) => section.items.length > 0 || section.text);
       const dynamicSections = [...baseSections];
 
-      // Always expose the complete extracted PDF text as an editable source
-      // section. Structured fields are convenient for editing, but they are
-      // not allowed to become the only copy of imported content: section
-      // detection can miss or misassociate lines in dense/multi-column PDFs.
-      if (typeof imported.importedText === 'string' && imported.importedText.trim()) {
-        const sourceKey = 'imported_source_' + uuidv4().slice(0, 8);
-        dynamicSections.push({
-          key: sourceKey,
-          title: 'Original Imported Content',
-          isCustom: true,
-          type: 'text',
-          isImportedSource: true
-        });
-        customDataPayload[sourceKey] = imported.importedText;
-      }
+      // Keep the raw extracted text as private import metadata below.
+      // Do not add it to the rendered section list: doing so duplicates the
+      // structured resume content in the editor preview and exported resume.
 
       customSections.forEach((section) => {
         const key = 'custom_' + uuidv4().slice(0, 8);

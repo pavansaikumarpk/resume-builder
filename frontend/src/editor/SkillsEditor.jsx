@@ -89,7 +89,7 @@
 //               placeholder={`Add to ${cat.category || 'Skills'}...`}
 //               value={newSkillInputs[cat.id] || ''}
 //               onChange={(e) => setNewSkillInputs(prev => ({ ...prev, [cat.id]: e.target.value }))}
-//               onKeyDown={(e) => handleAddSkill(cat.id, e)}
+//               onKeyDown={(e) => handleAddSkill(cat.category, e)}
 //               className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-xs font-medium text-slate-800 outline-none focus:bg-white focus:border-indigo-500 transition-all"
 //             />
 //           </div>

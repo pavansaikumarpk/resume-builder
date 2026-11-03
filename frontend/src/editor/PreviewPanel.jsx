@@ -181,7 +181,19 @@
 //             </div>
 //           );
           
-//           if (section.key === 'skills' && data.skills?.length > 0) return (
+//           if (section.key === 'certifications' && data.certifications?.length > 0) return (
+            <div key={section.key} className="resume-section" style={{ marginBottom: '6px' }}>
+              <div style={titleStyle}>{section.title}</div>
+              {data.certifications.map((certification, index) => (
+                <div key={index} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '3px' }}>
+                  <span><strong>{certification.name}</strong>{certification.issuer ? ' — ' + certification.issuer : ''}</span>
+                  <span style={{ whiteSpace: 'nowrap' }}>{certification.date}</span>
+                </div>
+              ))}
+            </div>
+          );
+
+          if (section.key === 'skills' && data.skills?.length > 0) return (
 //             <div key={section.key} className="resume-section" style={{ marginBottom: '8px' }}>
 //               <div style={titleStyle}>{section.title}</div>
 //               <div style={{ paddingLeft: '4px' }}>

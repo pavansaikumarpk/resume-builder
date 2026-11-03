@@ -19,6 +19,19 @@ api.interceptors.request.use((config) => {
   if (token && token !== 'undefined' && token !== 'null') {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Axios inherits the instance-wide JSON content type. That header breaks
+  // browser FormData uploads because the multipart boundary is not added.
+  // Remove it for FormData so the browser can set multipart/form-data correctly.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    if (typeof config.headers.delete === 'function') {
+      config.headers.delete('Content-Type');
+    } else {
+      delete config.headers['Content-Type'];
+      delete config.headers['content-type'];
+    }
+  }
+
   return config;
 });
 

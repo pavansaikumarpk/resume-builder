@@ -77,7 +77,7 @@
 //               {cat.items?.map((skill, skillIdx) => (
 //                 <span key={skill.id || `skill-${skillIdx}`} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg text-xs font-bold">
 //                   {skill.name}
-//                   <button type="button" onClick={() => removeSkillFromCategory(cat.id, skill.id)} className="text-indigo-400 hover:text-indigo-600 transition-colors">
+//                   <button type="button" onClick={() => removeSkillFromCategory(cat.id, skill.id, cat.category, skill.name)} className="text-indigo-400 hover:text-indigo-600 transition-colors">
 //                     <X size={12} />
 //                   </button>
 //                 </span>
@@ -121,12 +121,17 @@ export const SkillsEditor = () => {
   const { activeResume, addSkillCategory, addSkillToCategory, removeSkillFromCategory, organizeSkillsAi, isTailoring } = useResumeStore();
 
   const rawSkills = activeResume?.resumeData?.skills || [];
-  // Ensure every skill and every skill item has a unique client-side ID
-  const skills = rawSkills.map(skill =>
-    typeof skill === 'string'
-      ? { id: uuidv4(), category: 'General', items: [{ id: uuidv4(), name: skill }] }
-      : { ...skill, id: skill.id || uuidv4(), items: skill.items?.map(i => ({ ...i, id: i.id || uuidv4() })) || [] }
-  );
+  // Normalize legacy string skills without generating IDs on every render.
+  const skills = rawSkills.map((skill, index) => ({
+    id: skill?.id || 'legacy-category-' + index,
+    category: typeof skill === 'string' ? 'General' : (skill?.category || 'Skills'),
+    items: (typeof skill === 'string' ? [skill] : (Array.isArray(skill?.items) ? skill.items : []))
+      .map((item, itemIndex) => ({
+        id: typeof item === 'object' && item !== null && item.id ? item.id : 'legacy-skill-' + index + '-' + itemIndex,
+        name: typeof item === 'string' ? item : (item?.name || '')
+      }))
+      .filter((item) => item.name)
+  }));
 
   const [newCategory, setNewCategory] = useState('');
   const [newSkillInputs, setNewSkillInputs] = useState({});

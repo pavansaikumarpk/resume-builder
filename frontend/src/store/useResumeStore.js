@@ -51,7 +51,7 @@
 //       const formData = new FormData();
 //       formData.append('resumeFile', file);
 //       const { data } = await api.post('/import', formData, {
-//         headers: { 'Content-Type': 'multipart/form-data' },
+//         // Let the browser set the multipart boundary automatically.
 //       });
 
 //       if (data.resumeData) {
@@ -575,7 +575,7 @@ export const useResumeStore = create((set, get) => ({
       });
       const normalizedSkills = (Array.isArray(imported.skills) ? imported.skills : []).map((category) => ({
         id: category.id || uuidv4(),
-        category: category.category || 'General',
+        category: category.category || '',
         items: (Array.isArray(category.items) ? category.items : []).map((item) => ({
           id: typeof item === 'object' && item !== null && item.id ? item.id : uuidv4(),
           name: typeof item === 'string' ? item : (item?.name || '')
@@ -591,11 +591,14 @@ export const useResumeStore = create((set, get) => ({
         education: Array.isArray(imported.education) ? imported.education : [],
         projects: Array.isArray(imported.projects) ? imported.projects : [],
         skills: normalizedSkills,
+        certifications: Array.isArray(imported.certifications) ? imported.certifications : [],
         ...customDataPayload,
         sections: dynamicSections,
-        ...(imported.importedText ? { importedText: imported.importedText } : {})
+        ...(imported.importedText ? { importedText: imported.importedText } : {}),
+        ...(imported.importSource ? { importSource: imported.importSource } : {})
       };
       get().updateResumeData(freshResumeData);
+      if (data.warning) alert(data.warning);
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Failed to import resume. Please check the file and try again.');
     } finally {

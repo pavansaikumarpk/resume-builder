@@ -556,7 +556,19 @@ export const EditorPanel = () => {
                 {section.key === 'personalDetails' && (
                   <div className={styles.grid2}>
                     <div className={styles.colSpan2}>
-                      <ModernInput label="Full Name" icon={User} value={resumeData.personalInfo?.firstName || ''} onChange={(e) => handleUpdate('personalInfo', { ...resumeData.personalInfo, firstName: e.target.value })} />
+                      <ModernInput
+                        label="Full Name"
+                        icon={User}
+                        value={[resumeData.personalInfo?.firstName, resumeData.personalInfo?.lastName].filter(Boolean).join(' ')}
+                        onChange={(e) => {
+                          const parts = e.target.value.trim().split(/\s+/).filter(Boolean);
+                          handleUpdate('personalInfo', {
+                            ...resumeData.personalInfo,
+                            firstName: parts.shift() || '',
+                            lastName: parts.join(' ')
+                          });
+                        }}
+                      />
                     </div>
                     <ModernInput label="Email" type="email" icon={Mail} value={resumeData.personalInfo?.email || ''} onChange={(e) => handleUpdate('personalInfo', { ...resumeData.personalInfo, email: e.target.value })} />
                     <ModernInput label="Phone" icon={Phone} value={resumeData.personalInfo?.phone || ''} onChange={(e) => handleUpdate('personalInfo', { ...resumeData.personalInfo, phone: e.target.value })} />

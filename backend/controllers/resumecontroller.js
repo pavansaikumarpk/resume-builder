@@ -71,7 +71,7 @@ const createResume = async (req, res) => {
 
 const updateResume = async (req, res) => {
     try {
-        const { resumeData, templateName, isPublic, slug } = req.body;
+        const { resumeData, templateName, isPublic, slug, title, documentStyle } = req.body;
         const resume = await Resume.findById(req.params.id);
 
         if (resume && resume.user.toString() === req.user._id.toString()) {
@@ -83,6 +83,11 @@ const updateResume = async (req, res) => {
             }
 
             if (templateName) resume.templateName = templateName;
+            if (typeof title === 'string' && title.trim()) resume.title = title.trim().slice(0, 120);
+            if (documentStyle && typeof documentStyle === 'object' && !Array.isArray(documentStyle)) {
+                resume.documentStyle = documentStyle;
+                resume.markModified('documentStyle');
+            }
             if (isPublic !== undefined) resume.isPublic = isPublic;
             
             if (slug && slug !== resume.slug) {

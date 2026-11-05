@@ -69,12 +69,12 @@
 // // Processes arrays iteratively to circumvent truncation limits
 // const normalizeBulletList = (value) => {
   if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean);
-  if (typeof value === 'string') return value.split(/\r?\n/).map((item) => item.replace(/^\\s*[•*-]\\s*/, '').trim()).filter(Boolean);
+  if (typeof value === 'string') return value.split(/\r?\n/).map((item) => item.replace(/^\s*[•*-]\s*/, '').trim()).filter(Boolean);
   return [];
 };
 
 const optimizeArrayData = async (items, jd, sectionName) => {
-  if (!Array.isArray(items) || !items.length) return { items: items || [], changedCount: 0, failed: false };
+  if (!Array.isArray(items) || !items.length) return { items: items || [], changedCount: 0, reviewedCount: 0, failed: false };
 
   const mapped = items.map((item, index) => ({
     _index: index,
@@ -84,7 +84,7 @@ const optimizeArrayData = async (items, jd, sectionName) => {
     bullets: normalizeBulletList(item.description ?? item.bulletPoints ?? item.text)
   })).filter((item) => item.bullets.length);
 
-  if (!mapped.length) return { items, changedCount: 0, failed: false, reason: 'No source bullets were available to tailor.' };
+  if (!mapped.length) return { items, changedCount: 0, reviewedCount: 0, failed: false, reason: 'No source bullets were available to tailor.' };
 
   const systemInstruction = `You are an evidence-grounded resume tailoring specialist.
 Rewrite the candidate's existing resume bullets for the target job description.
@@ -177,8 +177,8 @@ const magicTailor = async (req, res) => {
     };
 
     const summaryOptions = readResult(results[0], [resumeData.summary].filter(Boolean), 'Summary');
-    const experienceResult = readResult(results[1], { items: resumeData.experience || [], changedCount: 0 }, 'Experience');
-    const projectsResult = readResult(results[2], { items: resumeData.projects || [], changedCount: 0 }, 'Projects');
+    const experienceResult = readResult(results[1], { items: resumeData.experience || [], changedCount: 0, reviewedCount: 0 }, 'Experience');
+    const projectsResult = readResult(results[2], { items: resumeData.projects || [], changedCount: 0, reviewedCount: 0 }, 'Projects');
     const skillsResult = readResult(results[3], resumeData.skills || [], 'Skills');
     const tailoredData = {
       ...resumeData,
@@ -188,7 +188,7 @@ const magicTailor = async (req, res) => {
       skills: skillsResult
     };
     customListSections.forEach((section, index) => {
-      const result = readResult(results[4 + index], { items: resumeData[section.key] || [], changedCount: 0 }, section.title);
+      const result = readResult(results[4 + index], { items: resumeData[section.key] || [], changedCount: 0, reviewedCount: 0 }, section.title);
       tailoredData[section.key] = result.items;
       if (result.failed) warnings.push(`${section.title} was left unchanged.`);
     });

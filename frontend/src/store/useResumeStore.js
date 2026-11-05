@@ -302,7 +302,7 @@ export const useResumeStore = create((set, get) => ({
   addCustomSection: (sectionDef) => {
     set((state) => {
       const sections = [...state.activeResume.resumeData.sections, sectionDef];
-      const initialData = sectionDef.type === 'list' ? [] : "";
+      const initialData = sectionDef.type === 'text' ? '' : [];
       return { 
         activeResume: { 
             ...state.activeResume, 

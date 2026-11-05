@@ -1,8 +1,18 @@
 import { create } from 'zustand';
 import api from '../utils/api';
 
+const readStoredUser = () => {
+  try {
+    const storedUser = localStorage.getItem('userInfo');
+    return storedUser ? JSON.parse(storedUser) : null;
+  } catch {
+    localStorage.removeItem('userInfo');
+    return null;
+  }
+};
+
 export const useAuthStore = create((set) => ({
-  user: JSON.parse(localStorage.getItem('userInfo')) || null,
+  user: readStoredUser(),
   isLoading: false,
 
   login: async (email, password) => {

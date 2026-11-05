@@ -36,7 +36,7 @@ export default function TemplatesPage() {
           ]
         }
       });
-      navigate(`/editor/${data._id}`);
+      navigate(`/workspace/${data._id}`);
     } catch (err) {
       console.error(err);
       setLoading(null);

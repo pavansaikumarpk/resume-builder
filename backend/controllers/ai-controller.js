@@ -254,20 +254,21 @@ const callAIEngineWithRetry = async (prompt, systemInstruction, options = {}, re
 
 const optimizeSummary = async (summary, jd) => {
   if (!summary) return [];
-  const sys = `You are an elite ATS architect. Synthesize a commanding executive summary into exactly 3 highly optimized variations.
-  Variation 1: Metric & Impact Driven.
-  Variation 2: Strategic & Leadership Focus.
-  Variation 3: Technical & Keyword Heavy.
-  Return JSON: { "options": ["string1", "string2", "string3"] }`;
-  const prompt = `JD:\n${jd}\n\nCurrent Summary:\n${summary}`;
-  
-  try {
-    const out = await callAIEngineWithRetry(prompt, sys, { maxTokens: 800 });
-    const parsed = extractCleanJSON(out);
-    return parsed.options || [summary];
-  } catch (err) {
-    return [summary];
+  const systemInstruction = `You are an evidence-grounded resume summary editor.
+Create up to three concise alternatives tailored to the target job description.
+Use only facts, skills, tools, responsibilities, and outcomes explicitly supported by the original resume.
+Never invent metrics, years of experience, certifications, technologies, seniority, leadership, or achievements.
+Use relevant language from the job description only when the resume provides evidence for it.
+Do not keyword-stuff or claim qualifications the candidate does not have.
+If tailoring cannot make the summary genuinely better without adding unsupported claims, return the original summary as the only option.
+Return only JSON: { "options": ["summary option 1", "summary option 2"] }`;
+  const prompt = `TARGET JOB DESCRIPTION:\n${jd}\n\nORIGINAL RESUME SUMMARY (source of truth):\n${summary}`;
+  const out = await callAIEngineWithRetry(prompt, systemInstruction, { maxTokens: 900, temperature: 0.2 });
+  const parsed = extractCleanJSON(out);
+  if (!Array.isArray(parsed.options) || !parsed.options.some((option) => typeof option === 'string' && option.trim())) {
+    throw new Error('AI returned no valid summary options.');
   }
+  return parsed.options.filter((option) => typeof option === 'string' && option.trim()).slice(0, 3);
 };
 
 const organizeSkillsEngine = async (skillsArray, jd) => {

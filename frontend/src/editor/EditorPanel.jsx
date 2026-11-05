@@ -288,7 +288,7 @@
 //                  </div>
 //                )}
 
-//                {section.key === 'certifications' && (
+                {section.key === 'certifications' && (
                   <div>
                     {(resumeData.certifications || []).map((certification, idx) => (
                       <div key={idx} className={styles.dataBlock}>

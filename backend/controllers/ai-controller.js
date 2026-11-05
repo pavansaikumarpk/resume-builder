@@ -80,7 +80,8 @@ const optimizeArrayData = async (items, jd, sectionName) => {
     _index: index,
     title: item.title || item.company || item.name || item.position || sectionName,
     role: item.position || item.jobTitle || '',
-    bullets: normalizeBulletList(item.description ?? item.bulletPoints)
+    bulletField: item.description !== undefined ? 'description' : (item.bulletPoints !== undefined ? 'bulletPoints' : 'text'),
+    bullets: normalizeBulletList(item.description ?? item.bulletPoints ?? item.text)
   })).filter((item) => item.bullets.length);
 
   if (!mapped.length) return { items, changedCount: 0, failed: false, reason: 'No source bullets were available to tailor.' };
@@ -92,9 +93,14 @@ Rules:
 - Preserve the candidate's actual responsibilities, tools, technologies, scope and results.
 - Never invent employers, projects, tools, certifications, metrics, percentages, scale, leadership, or business impact.
 - Do not copy job-description requirements as if the candidate has done them.
-- If a source bullet has no truthful connection to the target role, retain its meaning and improve clarity only; do not force keyword stuffing.
-- Each rewritten bullet must be materially clearer or more relevant than its source, concise, ATS-readable, and start with a strong action verb where appropriate.
-- Return one rewritten bullet for every source bullet, keeping the same item and bullet counts and preserving the original order.
+- Evaluate EVERY source bullet independently against the target job description; do not stop after the strongest or easiest bullets.
+- Attempt a rewrite for every bullet, but return the exact original wording when no truthful, material improvement would make that bullet more relevant, clearer, or stronger for THIS job.
+- Keep bullets that are already strong and relevant unchanged. Do not rewrite merely to create the appearance of work.
+- If a bullet has no truthful connection to the target role and cannot be improved without changing its meaning, return it unchanged.
+- Preserve the candidate's actual responsibilities, tools, technologies, scope and results. Never invent or infer missing qualifications.
+- A changed bullet must be materially better for this specific job, concise, ATS-readable, and start with a strong action verb where appropriate.
+- Return exactly one result for every input bullet, in the same item order and bullet order. Use the exact source text for any bullet you decide not to improve.
+- The job description may describe ANY industry, role, seniority, or technology. Do not assume a particular company, job family, or technology stack.
 Return only valid JSON in this exact schema:
 { "optimized": [ { "_index": 0, "bullets": ["rewritten bullet"] } ] }`;
 
@@ -128,11 +134,15 @@ Tailor each bullet to the target role without adding unsupported claims.`;
       bullet.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() !==
       source.bullets[bulletIndex].toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
     ).length;
-    if (original.description !== undefined) return { ...original, description: bullets };
-    return { ...original, bulletPoints: bullets };
+    return { ...original, [source.bulletField]: bullets };
   });
 
-  return { items: optimizedItems, changedCount, failed: false };
+  return {
+    items: optimizedItems,
+    changedCount,
+    reviewedCount: mapped.reduce((total, item) => total + item.bullets.length, 0),
+    failed: false
+  };
 };
 
 // ============================================================================
@@ -144,7 +154,9 @@ const magicTailor = async (req, res) => {
   if (!jobDescription || !resumeData) return res.status(400).json({ success: false, error: "Insufficient parameters." });
 
   try {
-    const customListSections = (resumeData.sections || []).filter((section) => section.isCustom && section.type === 'list');
+    const customListSections = (resumeData.sections || []).filter((section) =>
+      section.isCustom && (section.type === 'list' || section.type === 'bullets')
+    );
     const customPromises = customListSections.map((section) =>
       optimizeArrayData(resumeData[section.key] || [], jobDescription, section.title)
     );
@@ -181,17 +193,18 @@ const magicTailor = async (req, res) => {
       if (result.failed) warnings.push(`${section.title} was left unchanged.`);
     });
 
+    const customResults = customListSections.map((section, index) => results[4 + index]);
     const changedBulletCount = experienceResult.changedCount + projectsResult.changedCount +
-      customListSections.reduce((total, section, index) => {
-        const result = results[4 + index];
-        return total + (result.status === 'fulfilled' ? result.value.changedCount : 0);
-      }, 0);
+      customResults.reduce((total, result) => total + (result.status === 'fulfilled' ? result.value.changedCount : 0), 0);
+    const reviewedBulletCount = experienceResult.reviewedCount + projectsResult.reviewedCount +
+      customResults.reduce((total, result) => total + (result.status === 'fulfilled' ? result.value.reviewedCount : 0), 0);
 
     return res.status(200).json({
       success: true,
       tailoredData,
       summaryOptions,
       changedBulletCount,
+      reviewedBulletCount,
       warnings
     });
   } catch (error) {

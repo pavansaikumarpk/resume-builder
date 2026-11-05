@@ -386,34 +386,46 @@ export const useResumeStore = create((set, get) => ({
       const tailored = data.tailoredData;
       const tailoredItems = [];
       const sections = (original.sections || []).filter((section) =>
-        section.key === 'experience' || section.key === 'projects' || (section.isCustom && section.type === 'list')
+        section.key === 'experience' || section.key === 'projects' ||
+        (section.isCustom && (section.type === 'list' || section.type === 'bullets'))
       );
+      const normalize = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      const toBulletEntries = (value) => {
+        const entries = Array.isArray(value) ? value : String(value || '').split('\\n');
+        return entries
+          .map((bullet, index) => ({ index, text: String(bullet || '').trim() }))
+          .filter((entry) => entry.text);
+      };
 
       sections.forEach((section) => {
         const sourceItems = Array.isArray(original[section.key]) ? original[section.key] : [];
         const proposedItems = Array.isArray(tailored[section.key]) ? tailored[section.key] : [];
-        sourceItems.forEach((sourceItem, index) => {
-          const proposedItem = proposedItems[index];
+        sourceItems.forEach((sourceItem, itemIndex) => {
+          const proposedItem = proposedItems[itemIndex];
           if (!proposedItem) return;
-          const field = sourceItem.description !== undefined ? 'description' : 'bulletPoints';
-          const sourceBullets = Array.isArray(sourceItem[field])
-            ? sourceItem[field].map((bullet) => String(bullet || '').trim()).filter(Boolean)
-            : String(sourceItem[field] || '').split('\\n').map((bullet) => bullet.trim()).filter(Boolean);
-          const proposedBullets = Array.isArray(proposedItem[field])
-            ? proposedItem[field].map((bullet) => String(bullet || '').trim()).filter(Boolean)
-            : String(proposedItem[field] || '').split('\\n').map((bullet) => bullet.trim()).filter(Boolean);
-          const normalize = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-          const changed = proposedBullets.filter((bullet, bulletIndex) =>
-            normalize(bullet) !== normalize(sourceBullets[bulletIndex] || '')
-          );
-          if (changed.length) {
+          const field = sourceItem.description !== undefined
+            ? 'description'
+            : (sourceItem.bulletPoints !== undefined ? 'bulletPoints' : 'text');
+          const sourceBullets = toBulletEntries(sourceItem[field]);
+          const proposedBullets = toBulletEntries(proposedItem[field]);
+          const suggestions = sourceBullets.reduce((result, sourceBullet, position) => {
+            const proposedBullet = proposedBullets[position];
+            if (!proposedBullet || normalize(proposedBullet.text) === normalize(sourceBullet.text)) return result;
+            result.push({
+              bulletIndex: sourceBullet.index,
+              original: sourceBullet.text,
+              proposed: proposedBullet.text
+            });
+            return result;
+          }, []);
+
+          if (suggestions.length) {
             tailoredItems.push({
               sectionKey: section.title || section.key,
               targetSectionKey: section.key,
               itemTitle: sourceItem.company || sourceItem.name || sourceItem.title || sourceItem.position || 'Resume entry',
-              originalBullets: sourceBullets,
-              newSuggestions: proposedBullets,
-              itemIndex: index
+              itemIndex,
+              suggestions
             });
           }
         });
@@ -421,13 +433,7 @@ export const useResumeStore = create((set, get) => ({
 
       const summaryOptions = (Array.isArray(data.summaryOptions) ? data.summaryOptions : [])
         .filter((option) => typeof option === 'string' && option.trim() && option.trim() !== (original.summary || '').trim());
-      const warnings = Array.isArray(data.warnings) ? data.warnings : [];
-      if (!tailoredItems.length && !summaryOptions.length && !warnings.length) {
-        warnings.push('The AI did not produce any changes. Try again with a more specific job description.');
-      }
-      if (!tailoredItems.length && !summaryOptions.length && data.changedBulletCount === 0) {
-        warnings.push('No resume bullets were materially changed. Your original resume has not been modified.');
-      }
+      const warnings = Array.isArray(data.warnings) ? [...data.warnings] : [];
 
       set({
         generatedBullets: {
@@ -435,7 +441,8 @@ export const useResumeStore = create((set, get) => ({
           summaryOptions,
           tailoredItems,
           warnings,
-          changedBulletCount: data.changedBulletCount || 0
+          changedBulletCount: data.changedBulletCount || 0,
+          reviewedBulletCount: data.reviewedBulletCount || 0
         }
       });
       return true;
@@ -560,6 +567,38 @@ export const useResumeStore = create((set, get) => ({
     });
 
     updateResumeData({ ...activeResume.resumeData, skills: currentSkills });
+  },
+
+  applyTailoredBullet: (sectionKey, itemIndex, bulletIndex, expectedOriginal, replacement) => {
+    const { activeResume, updateResumeData } = get();
+    if (!activeResume?.resumeData || !sectionKey || !Number.isInteger(itemIndex) || !Number.isInteger(bulletIndex)) return false;
+
+    const currentItems = activeResume.resumeData[sectionKey];
+    const targetItem = Array.isArray(currentItems) ? currentItems[itemIndex] : null;
+    if (!targetItem) return false;
+
+    const field = targetItem.description !== undefined
+      ? 'description'
+      : (targetItem.bulletPoints !== undefined ? 'bulletPoints' : 'text');
+    const currentValue = targetItem[field];
+    const isArray = Array.isArray(currentValue);
+    const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\\n');
+    const currentBullet = String(bulletList[bulletIndex] || '').trim();
+
+    // Refuse to overwrite if the user edited the source bullet after suggestions were generated.
+    if (currentBullet !== String(expectedOriginal || '').trim()) return false;
+
+    bulletList[bulletIndex] = replacement;
+    const updatedItems = [...currentItems];
+    updatedItems[itemIndex] = {
+      ...targetItem,
+      [field]: isArray ? bulletList : bulletList.join('\\n')
+    };
+    updateResumeData({
+      ...activeResume.resumeData,
+      [sectionKey]: updatedItems
+    });
+    return true;
   },
 
   appendBulletToResume: (sectionKey, targetIdentifier, newBullet) => {

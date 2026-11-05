@@ -574,26 +574,43 @@ const DynamicTemplate = ({ data, documentStyle }) => {
             </div>
           );
           
-          if (section.isCustom && data[section.key]) return (
+          if (section.isCustom && (
+            section.type === 'text'
+              ? Boolean(data[section.key])
+              : Array.isArray(data[section.key]) && data[section.key].length > 0
+          )) return (
             <div key={section.key} className="resume-section" style={{ marginBottom: '6px' }}>
               <div style={titleStyle}>{section.title}</div>
-              {section.type === 'text' ? <div style={{ whiteSpace: 'pre-wrap', paddingLeft: '4px' }}>{data[section.key]}</div> : (
+              {section.type === 'text' ? (
+                <div style={{ whiteSpace: 'pre-wrap', paddingLeft: '4px' }}>{data[section.key]}</div>
+              ) : section.type === 'bullets' ? (
+                <ul style={{ margin: '2px 0 0 0', paddingLeft: '24px', listStyleType: 'none' }}>
+                  {data[section.key].map((point, index) => {
+                    const text = typeof point === 'string' ? point : (point?.text || '');
+                    return text.trim() ? (
+                      <li key={index} style={{ position: 'relative', marginBottom: '2px' }}>
+                        <span style={{ position: 'absolute', left: '-14px' }}>•</span>{text}
+                      </li>
+                    ) : null;
+                  })}
+                </ul>
+              ) : (
                 section.title.toLowerCase() === 'languages' ? (
-                  <div style={{ paddingLeft: '4px' }}>{(Array.isArray(data[section.key]) ? data[section.key] : []).map(lang => typeof lang === 'string' ? lang : (lang.bulletPoints || []).join(' ')).join(' | ')}</div>
+                  <div style={{ paddingLeft: '4px' }}>{data[section.key].map(lang => typeof lang === 'string' ? lang : (lang.bulletPoints || []).join(' ')).join(' | ')}</div>
                 ) : (
-                  Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
+                  data[section.key].map((item, i) => (
                     <div key={i} style={{ marginBottom: '8px' }}>
                       {(item.title || item.date) && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontWeight: 'bold', color: '#000' }}>
-                            <span>{item.title || ''}</span>
-                            <span style={{ fontWeight: 'normal', whiteSpace: 'nowrap', fontSize: '0.95em' }}>{item.date || ''}</span>
-                          </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontWeight: 'bold', color: '#000' }}>
+                          <span>{item.title || ''}</span>
+                          <span style={{ fontWeight: 'normal', whiteSpace: 'nowrap', fontSize: '0.95em' }}>{item.date || ''}</span>
+                        </div>
                       )}
                       {item.bulletPoints && (
                         <ul style={{ margin: (item.title || item.date) ? '2px 0 0 0' : '0', paddingLeft: '24px', listStyleType: 'none' }}>
-                          {(Array.isArray(item.bulletPoints) ? item.bulletPoints : [item.bulletPoints]).filter(Boolean).map((b, bIdx) => (
-                            <li key={bIdx} style={{ position: 'relative', marginBottom: '2px' }}>
-                                <span style={{ position: 'absolute', left: '-14px' }}>•</span>{b}
+                          {(Array.isArray(item.bulletPoints) ? item.bulletPoints : [item.bulletPoints]).filter(Boolean).map((bullet, bulletIndex) => (
+                            <li key={bulletIndex} style={{ position: 'relative', marginBottom: '2px' }}>
+                              <span style={{ position: 'absolute', left: '-14px' }}>•</span>{bullet}
                             </li>
                           ))}
                         </ul>

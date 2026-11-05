@@ -5,6 +5,7 @@ import { Button } from '../components/Button';
 
 export const ResumeCard = ({ resume }) => {
   const deleteResume = useResumeStore(state => state.deleteResume);
+  const resumeId = resume?._id || resume?.id;
 
   return (
     <motion.div
@@ -21,7 +22,9 @@ export const ResumeCard = ({ resume }) => {
         <Button 
           variant="danger" 
           className="p-2.5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={() => deleteResume(resume.id)}
+          onClick={() => deleteResume(resumeId)}
+          aria-label={`Delete ${resume.title || 'resume'}`}
+          type="button"
         >
           <Trash2 size={16} />
         </Button>
@@ -34,7 +37,8 @@ export const ResumeCard = ({ resume }) => {
       </div>
 
       <div className="flex gap-2">
-        <Button className="w-full py-3 rounded-xl bg-slate-100 text-slate-900 hover:bg-blue-600 hover:text-white" onClick={() => window.location.href=`/editor/${resume.id}`}>
+        <Button className="w-full py-3 rounded-xl bg-slate-100 text-slate-900 hover:bg-blue-600 hover:text-white" onClick={() => { window.location.href = `/workspace/${resumeId}`; }}
+          type="button">
           Edit <ExternalLink size={14} />
         </Button>
       </div>

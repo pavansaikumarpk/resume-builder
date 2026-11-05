@@ -19,7 +19,7 @@
 // export default function WorkspacePage() {
 //   const { id } = useParams();
 //   const navigate = useNavigate();
-//   const { fetchActiveResume, isLoading, activeResume, isSaving } = useResumeStore();
+//   const { fetchActiveResume, isLoading, activeResume, isSaving, loadError, saveError } = useResumeStore();
 
 //   const [isAiMode, setIsAiMode] = React.useState(false);
 //   const aiPanelRef = useRef(null);
@@ -185,10 +185,21 @@ export default function WorkspacePage() {
     }
   };
 
-  if (isLoading || !activeResume) {
+  if (isLoading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-white">
         <Loader2 className="animate-spin text-zinc-900" size={32} />
+      </div>
+    );
+  }
+
+  if (!activeResume) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center gap-4 bg-white px-6 text-center">
+        <p className="text-sm text-zinc-600">{loadError || 'This resume could not be loaded.'}</p>
+        <button type="button" onClick={() => navigate('/dashboard')} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700">
+          Back to dashboard
+        </button>
       </div>
     );
   }
@@ -211,6 +222,7 @@ export default function WorkspacePage() {
               <Cloud size={12} className="animate-pulse text-zinc-400" /> Saving...
             </span>
           )}
+          {saveError && <span role="status" className="ml-2 text-[10px] font-semibold text-red-600" title={saveError}>Save failed</span>}
         </div>
 
         <button onClick={toggleAiMode} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-200 text-xs font-semibold ${isAiMode ? "bg-[#e0f2fe] border-sky-300 text-sky-700 shadow-inner" : "bg-white border-zinc-200 text-zinc-500 hover:text-zinc-900 hover:bg-[#fafafa]"}`}>

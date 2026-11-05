@@ -10,7 +10,8 @@ import AIUsageBadge from './components/AIUsageBadge';
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
-  return token ? children : <Navigate to="/login" />;
+  const hasValidToken = Boolean(token && token !== 'undefined' && token !== 'null');
+  return hasValidToken ? children : <Navigate to="/login" replace />;
 }
 
 export default function App() {

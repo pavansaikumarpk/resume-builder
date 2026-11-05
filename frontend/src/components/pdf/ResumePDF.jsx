@@ -614,18 +614,33 @@ const LatexTemplate = ({ data, config }) => {
                     </View>
                 );
 
-                if (section.isCustom && data[section.key]) return (
+                if (section.isCustom && (
+                    section.type === 'text'
+                        ? Boolean(data[section.key])
+                        : Array.isArray(data[section.key]) && data[section.key].length > 0
+                )) return (
                     <View key={idx} style={styles.sectionBlock}>
                         <Text style={styles.sectionTitle}>{section.title}</Text>
-                        {section.type === 'text' ? <Text style={{ paddingLeft: 4 }}>{data[section.key]}</Text> : (
+                        {section.type === 'text' ? (
+                            <Text style={{ paddingLeft: 4 }}>{data[section.key]}</Text>
+                        ) : section.type === 'bullets' ? (
+                            data[section.key].map((point, pointIndex) => {
+                                const pointText = typeof point === 'string' ? point : (point?.text || '');
+                                return pointText.trim() ? (
+                                    <View key={pointIndex} style={styles.bulletRow}>
+                                        <Text style={styles.bulletText}>{pointText}</Text>
+                                    </View>
+                                ) : null;
+                            })
+                        ) : (
                             section.title.toLowerCase() === 'languages' ? (
                                 <Text style={{ paddingLeft: 4 }}>
-                                    {(Array.isArray(data[section.key]) ? data[section.key] : [])
+                                    {data[section.key]
                                         .map(lang => typeof lang === 'string' ? lang : (lang.bulletPoints || []).join(' '))
                                         .join(' | ')}
                                 </Text>
                             ) : (
-                                Array.isArray(data[section.key]) && data[section.key].map((item, i) => (
+                                data[section.key].map((item, i) => (
                                     <View key={i} style={{ marginBottom: 6 }}>
                                         <View style={styles.row}>
                                             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
@@ -638,10 +653,9 @@ const LatexTemplate = ({ data, config }) => {
                                             </View>
                                             <Text>{item.date}</Text>
                                         </View>
-                                        {Array.isArray(item.bulletPoints) && item.bulletPoints.filter(Boolean).map((b, bIdx) => (
-                                            <View key={bIdx} style={styles.bulletRow}>
-                                                <Text style={styles.bullet}>•</Text>
-                                                <Text style={styles.bulletText}>{b}</Text>
+                                        {Array.isArray(item.bulletPoints) && item.bulletPoints.filter(Boolean).map((bullet, bulletIndex) => (
+                                            <View key={bulletIndex} style={styles.bulletRow}>
+                                                <Text style={styles.bulletText}>{bullet}</Text>
                                             </View>
                                         ))}
                                     </View>

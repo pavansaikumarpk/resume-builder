@@ -168,7 +168,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 export default function WorkspacePage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { fetchActiveResume, isLoading, activeResume, isSaving } = useResumeStore();
+  const { fetchActiveResume, isLoading, activeResume, isSaving, loadError, saveError } = useResumeStore();
   const [isAiMode, setIsAiMode] = React.useState(false);
   const aiPanelRef = useRef(null);
 

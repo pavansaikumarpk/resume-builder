@@ -303,7 +303,7 @@ const optimizeArrayData = async (items, jd, sectionName) => {
 
   if (!mapped.length) return { items, changedCount: 0, reviewedCount: 0, failed: false, reason: 'No source bullets were available to tailor.' };
 
-  const systemInstruction = \`You are an evidence-grounded resume tailoring specialist.
+  const systemInstruction = `You are an evidence-grounded resume tailoring specialist.
 Tailor the candidate's existing resume bullets to the job description supplied in this request.
 Rules:
 - Evaluate EVERY source bullet independently against THIS job description. Do not stop after the strongest or easiest bullets.
@@ -317,19 +317,19 @@ Rules:
 - Return exactly one result for every input bullet, in the same item and bullet order. Use the exact source text for any bullet you decide not to improve.
 - The job description may describe ANY industry, role, seniority, or technology. Do not assume a particular company, job family, or technology stack.
 Return only valid JSON in this exact schema:
-{ "optimized": [ { "_index": 0, "bullets": ["rewritten or unchanged original bullet"] } ] }\`;
+{ "optimized": [ { "_index": 0, "bullets": ["rewritten or unchanged original bullet"] } ] }`;
 
-  const prompt = \`TARGET JOB DESCRIPTION:
-\${jd}
+  const prompt = `TARGET JOB DESCRIPTION:
+${jd}
 
 CANDIDATE SOURCE DATA (the only source of candidate facts):
-\${JSON.stringify(mapped)}
+${JSON.stringify(mapped)}
 
-Evaluate every bullet. Rewrite only those with a truthful, material improvement for this job; return all other bullets exactly as written.\`;
+Evaluate every bullet. Rewrite only those with a truthful, material improvement for this job; return all other bullets exactly as written.`;
 
   const raw = await callAIEngineWithRetry(prompt, systemInstruction, { maxTokens: 5000, temperature: 0.2 });
   const parsed = extractCleanJSON(raw);
-  if (!Array.isArray(parsed.optimized)) throw new Error(\`AI returned an invalid \${sectionName} response.\`);
+  if (!Array.isArray(parsed.optimized)) throw new Error(`AI returned an invalid ${sectionName} response.`);
 
   let changedCount = 0;
   const optimizedItems = items.map((original, index) => {
@@ -338,7 +338,7 @@ Evaluate every bullet. Rewrite only those with a truthful, material improvement 
     const result = parsed.optimized.find((entry) => entry._index === index);
     const bullets = normalizeBulletList(result?.bullets);
     if (bullets.length !== source.bullets.length) {
-      throw new Error(\`AI returned an incomplete bullet set for \${sectionName} item \${index + 1}.\`);
+      throw new Error(`AI returned an incomplete bullet set for ${sectionName} item ${index + 1}.`);
     }
     const sourceBullets = source.bullets;
     const changedHere = bullets.filter((bullet, bulletIndex) =>
@@ -384,7 +384,7 @@ const magicTailor = async (req, res) => {
     const warnings = [];
     const readResult = (result, fallback, label) => {
       if (result.status === 'fulfilled') return result.value;
-      warnings.push(\`\${label} could not be tailored: \${result.reason?.message || 'AI request failed'}\`);
+      warnings.push(`${label} could not be tailored: ${result.reason?.message || 'AI request failed'}`);
       return fallback;
     };
 

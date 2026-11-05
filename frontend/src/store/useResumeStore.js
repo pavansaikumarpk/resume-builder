@@ -391,7 +391,7 @@ export const useResumeStore = create((set, get) => ({
       );
       const normalize = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
       const toBulletEntries = (value) => {
-        const entries = Array.isArray(value) ? value : String(value || '').split('\\n');
+        const entries = Array.isArray(value) ? value : String(value || '').split('\n');
         return entries
           .map((bullet, index) => ({ index, text: String(bullet || '').trim() }))
           .filter((entry) => entry.text);
@@ -582,7 +582,7 @@ export const useResumeStore = create((set, get) => ({
       : (targetItem.bulletPoints !== undefined ? 'bulletPoints' : 'text');
     const currentValue = targetItem[field];
     const isArray = Array.isArray(currentValue);
-    const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\\n');
+    const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\n');
     const currentBullet = String(bulletList[bulletIndex] || '').trim();
 
     // Refuse to overwrite if the user edited the source bullet after suggestions were generated.

@@ -583,17 +583,21 @@ const DynamicTemplate = ({ data, documentStyle }) => {
               <div style={titleStyle}>{section.title}</div>
               {section.type === 'text' ? (
                 <div style={{ whiteSpace: 'pre-wrap', paddingLeft: '4px' }}>{data[section.key]}</div>
-              ) : section.type === 'bullets' ? (
-                <ul style={{ margin: '2px 0 0 0', paddingLeft: '24px', listStyleType: 'none' }}>
+               ) : section.type === 'bullets' ? (
+                <div>
                   {data[section.key].map((point, index) => {
-                    const text = typeof point === 'string' ? point : (point?.text || '');
-                    return text.trim() ? (
-                      <li key={index} style={{ position: 'relative', marginBottom: '2px' }}>
-                        <span style={{ position: 'absolute', left: '-14px' }}>•</span>{text}
-                      </li>
+                    const pointText = typeof point === 'string' ? point : (point?.text || '');
+                    const pointDate = typeof point === 'object' ? (point.date || '') : '';
+                    return pointText.trim() || pointDate ? (
+                      <div key={index} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '3px' }}>
+                        <div style={{ position: 'relative', paddingLeft: '14px', flex: 1 }}>
+                          <span style={{ position: 'absolute', left: 0 }}>•</span>{pointText}
+                        </div>
+                        {pointDate && <span style={{ whiteSpace: 'nowrap' }}>{pointDate}</span>}
+                      </div>
                     ) : null;
                   })}
-                </ul>
+                </div>
               ) : (
                 section.title.toLowerCase() === 'languages' ? (
                   <div style={{ paddingLeft: '4px' }}>{data[section.key].map(lang => typeof lang === 'string' ? lang : (lang.bulletPoints || []).join(' ')).join(' | ')}</div>

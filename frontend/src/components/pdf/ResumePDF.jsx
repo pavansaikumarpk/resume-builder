@@ -623,15 +623,20 @@ const LatexTemplate = ({ data, config }) => {
                         <Text style={styles.sectionTitle}>{section.title}</Text>
                         {section.type === 'text' ? (
                             <Text style={{ paddingLeft: 4 }}>{data[section.key]}</Text>
-                        ) : section.type === 'bullets' ? (
+                         ) : section.type === 'bullets' ? (
                             data[section.key].map((point, pointIndex) => {
                                 const pointText = typeof point === 'string' ? point : (point?.text || '');
-                                return pointText.trim() ? (
-                                    <View key={pointIndex} style={styles.bulletRow}>
-                                        <Text style={styles.bulletText}>{pointText}</Text>
+                                const pointDate = typeof point === 'object' ? (point.date || '') : '';
+                                return pointText.trim() || pointDate ? (
+                                    <View key={pointIndex} style={{ ...styles.row, marginBottom: 3 }}>
+                                        <View style={{ flexDirection: 'row', flex: 1 }}>
+                                            <Text style={styles.bulletText}>• {pointText}</Text>
+                                        </View>
+                                        {pointDate ? <Text>{pointDate}</Text> : null}
                                     </View>
                                 ) : null;
                             })
+
                         ) : (
                             section.title.toLowerCase() === 'languages' ? (
                                 <Text style={{ paddingLeft: 4 }}>

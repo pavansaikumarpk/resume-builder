@@ -723,13 +723,25 @@ export const EditorPanel = () => {
                         {(resumeData[section.key] || []).map((point, idx) => (
                           <div key={idx} className={styles.dataBlock}>
                             <button type="button" onClick={() => removeArrayItem(section.key, idx)} aria-label={`Remove point ${idx + 1}`} className={styles.deleteBlockBtn}><Trash2 size={16} /></button>
+                            <div className={styles.grid2}>
+                              <ModernInput
+                                label="Date / Timeline"
+                                placeholder="e.g. Oct 2026"
+                                value={typeof point === 'object' ? (point.date || '') : ''}
+                                onChange={(e) => {
+                                  const points = [...(resumeData[section.key] || [])];
+                                  points[idx] = { ...(typeof points[idx] === 'object' ? points[idx] : { text: points[idx] || '' }), date: e.target.value };
+                                  handleUpdate(section.key, points);
+                                }}
+                              />
+                            </div>
                             <div className={styles.inputGroup}>
                               <label className={styles.textareaLabel}>Point {idx + 1}</label>
                               <textarea
                                 value={typeof point === 'string' ? point : (point.text || '')}
                                 onChange={(e) => {
                                   const points = [...(resumeData[section.key] || [])];
-                                  points[idx] = e.target.value;
+                                  points[idx] = { ...(typeof points[idx] === 'object' ? points[idx] : {}), text: e.target.value };
                                   handleUpdate(section.key, points);
                                 }}
                                 placeholder="Enter a bullet point..."
@@ -739,7 +751,7 @@ export const EditorPanel = () => {
                             </div>
                           </div>
                         ))}
-                        <button type="button" onClick={() => addArrayItem(section.key, '')} className={styles.addBlockBtn}>
+                        <button type="button" onClick={() => addArrayItem(section.key, { date: '', text: '' })} className={styles.addBlockBtn}>
                           <Plus size={16} /> Add Another Point
                         </button>
                       </div>

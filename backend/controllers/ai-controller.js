@@ -69,7 +69,7 @@
 // // Processes arrays iteratively to circumvent truncation limits
 // const normalizeBulletList = (value) => {
   if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean);
-  if (typeof value === 'string') return value.split(/\\r?\\n/).map((item) => item.replace(/^\\s*[•*-]\\s*/, '').trim()).filter(Boolean);
+  if (typeof value === 'string') return value.split(/\r?\n/).map((item) => item.replace(/^\\s*[•*-]\\s*/, '').trim()).filter(Boolean);
   return [];
 };
 

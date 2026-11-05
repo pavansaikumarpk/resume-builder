@@ -288,7 +288,26 @@
 //                  </div>
 //                )}
 
-//                {section.key === 'summary' && (
+//                {section.key === 'certifications' && (
+                  <div>
+                    {(resumeData.certifications || []).map((certification, idx) => (
+                      <div key={idx} className={styles.dataBlock}>
+                        <button type="button" onClick={() => removeArrayItem('certifications', idx)} className={styles.deleteBlockBtn}><Trash2 size={16} /></button>
+                        <div className={styles.grid2}>
+                          <ModernInput label="Certification Name" value={certification.name || ''} onChange={(e) => updateArrayItem('certifications', idx, 'name', e.target.value)} />
+                          <ModernInput label="Issuing Organization" value={certification.issuer || ''} onChange={(e) => updateArrayItem('certifications', idx, 'issuer', e.target.value)} />
+                          <ModernInput label="Date" placeholder="e.g. Oct 2026" value={certification.date || ''} onChange={(e) => updateArrayItem('certifications', idx, 'date', e.target.value)} />
+                          <ModernInput label="Credential URL" icon={LinkIcon} placeholder="https://..." value={certification.link || ''} onChange={(e) => updateArrayItem('certifications', idx, 'link', e.target.value)} />
+                        </div>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => addArrayItem('certifications', { name: '', issuer: '', date: '', link: '' })} className={styles.addBlockBtn}>
+                      <Award size={16} /> Add Certification
+                    </button>
+                  </div>
+                )}
+
+                {section.key === 'summary' && (
 //                   <div className={styles.inputGroup}>
 //                     <label className={styles.textareaLabel}>Professional Summary</label>
 //                     <textarea 
@@ -382,7 +401,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useResumeStore } from '../store/useResumeStore';
-import { ChevronDown, ChevronUp, GripVertical, Trash2, Github, Linkedin, Mail, Phone, MapPin, User, Plus, Briefcase, GraduationCap, Loader2, Wand2, Link as LinkIcon } from 'lucide-react';
+import { ChevronDown, ChevronUp, GripVertical, Trash2, Github, Linkedin, Mail, Phone, MapPin, User, Plus, Briefcase, GraduationCap, Award, Loader2, Wand2, Link as LinkIcon } from 'lucide-react';
 import AddSectionModal from './AddSectionModal';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -694,10 +713,35 @@ export const EditorPanel = () => {
                         <textarea
                           value={resumeData[section.key] || ''}
                           onChange={(e) => handleUpdate(section.key, e.target.value)}
-                          placeholder="Provide description..."
+                          placeholder="Write your section details..."
                           rows={4}
                           className={styles.textareaField}
                         />
+                      </div>
+                    ) : section.type === 'bullets' ? (
+                      <div>
+                        {(resumeData[section.key] || []).map((point, idx) => (
+                          <div key={idx} className={styles.dataBlock}>
+                            <button type="button" onClick={() => removeArrayItem(section.key, idx)} aria-label={`Remove point ${idx + 1}`} className={styles.deleteBlockBtn}><Trash2 size={16} /></button>
+                            <div className={styles.inputGroup}>
+                              <label className={styles.textareaLabel}>Point {idx + 1}</label>
+                              <textarea
+                                value={typeof point === 'string' ? point : (point.text || '')}
+                                onChange={(e) => {
+                                  const points = [...(resumeData[section.key] || [])];
+                                  points[idx] = e.target.value;
+                                  handleUpdate(section.key, points);
+                                }}
+                                placeholder="Enter a bullet point..."
+                                rows={2}
+                                className={styles.textareaField}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => addArrayItem(section.key, '')} className={styles.addBlockBtn}>
+                          <Plus size={16} /> Add Another Point
+                        </button>
                       </div>
                     ) : (
                       <div>

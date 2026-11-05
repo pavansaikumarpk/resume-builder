@@ -271,24 +271,24 @@
 //                 )}
 
 //                 {section.key === 'certifications' && (
-                  <div>
-                    {(resumeData.certifications || []).map((certification, idx) => (
-                      <div key={idx} className={styles.dataBlock}>
-                        <button type="button" onClick={() => removeArrayItem('certifications', idx)} className={styles.deleteBlockBtn}><Trash2 size={16} /></button>
-                        <div className={styles.grid2}>
-                          <ModernInput label="Certification" value={certification.name || ''} onChange={(e) => updateArrayItem('certifications', idx, 'name', e.target.value)} />
-                          <ModernInput label="Issuing Organization" value={certification.issuer || ''} onChange={(e) => updateArrayItem('certifications', idx, 'issuer', e.target.value)} />
-                          <ModernInput label="Date" value={certification.date || ''} onChange={(e) => updateArrayItem('certifications', idx, 'date', e.target.value)} />
-                        </div>
-                      </div>
-                    ))}
-                    <button type="button" onClick={() => addArrayItem('certifications', { name: '', issuer: '', date: '' })} className={styles.addBlockBtn}>
-                      <Plus size={16} /> Add Certification
-                    </button>
-                  </div>
-                )}
+//                  <div>
+//                    {(resumeData.certifications || []).map((certification, idx) => (
+//                      <div key={idx} className={styles.dataBlock}>
+//                        <button type="button" onClick={() => removeArrayItem('certifications', idx)} className={styles.deleteBlockBtn}><Trash2 size={16} /></button>
+//                        <div className={styles.grid2}>
+//                          <ModernInput label="Certification" value={certification.name || ''} onChange={(e) => updateArrayItem('certifications', idx, 'name', e.target.value)} />
+//                          <ModernInput label="Issuing Organization" value={certification.issuer || ''} onChange={(e) => updateArrayItem('certifications', idx, 'issuer', e.target.value)} />
+//                          <ModernInput label="Date" value={certification.date || ''} onChange={(e) => updateArrayItem('certifications', idx, 'date', e.target.value)} />
+//                        </div>
+//                      </div>
+//                    ))}
+//                    <button type="button" onClick={() => addArrayItem('certifications', { name: '', issuer: '', date: '' })} className={styles.addBlockBtn}>
+//                      <Plus size={16} /> Add Certification
+//                    </button>
+//                  </div>
+//                )}
 
-                {section.key === 'summary' && (
+//                {section.key === 'summary' && (
 //                   <div className={styles.inputGroup}>
 //                     <label className={styles.textareaLabel}>Professional Summary</label>
 //                     <textarea 

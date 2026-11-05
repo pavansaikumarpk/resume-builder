@@ -82,7 +82,7 @@ export default function AddSectionModal({ isOpen, onClose }) {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {[
                 { value: 'list', title: 'List of Items', description: 'Entries with a title, date, links and details' },
-                { value: 'bullets', title: 'Bullet Points', description: 'Simple points, each with its own text box' },
+                { value: 'bullets', title: 'Simple Bullet Points', description: 'Text-only points with no title, date or link fields' },
                 { value: 'text', title: 'Text Block', description: 'One free-form paragraph or description' }
               ].map((option) => (
                 <button

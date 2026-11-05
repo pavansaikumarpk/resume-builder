@@ -82,7 +82,7 @@
 //             </div>
 //         )}
 
-//         {generatedBullets && hasGranularData && (
+//         {generatedBullets && (
 //           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             
 //             <div className="bg-white border rounded-xl p-4 flex justify-between items-center shadow-sm">
@@ -133,7 +133,7 @@
 //                               <span className="absolute top-4 left-3 w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
 //                               <p className="text-sm text-zinc-800 leading-relaxed pl-3">{bullet}</p>
 //                               <button 
-//                                   onClick={() => handleApplyBullet(itemGroup.sectionKey, itemGroup.itemTitle, bullet, uniqueId)}
+//                                   onClick={() => handleApplyBullet(itemGroup.targetSectionKey || itemGroup.sectionKey, itemGroup.itemTitle, bullet, uniqueId)}
 //                                   className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all ${isApplied ? 'bg-emerald-50 text-emerald-600' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-900 hover:text-white shadow-sm opacity-0 group-hover:opacity-100'}`}
 //                               >
 //                                   {isApplied ? <Check size={16} /> : <Plus size={16} />}
@@ -234,13 +234,18 @@ export const AnalysisPanel = () => {
         {generatedBullets && hasGranularData && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative z-0">
             
-            <div className="bg-white border rounded-xl p-4 flex justify-between items-center shadow-md relative z-10">
-               <span className="text-sm font-medium">Potential ATS Match</span>
-               <div className="flex items-center gap-2">
-                 <span className="text-lg font-bold text-zinc-400 line-through">{generatedBullets.atsScoreBefore}%</span>
-                 <span className="text-2xl font-black text-[#06b6d4] drop-shadow-[0_0_10px_rgba(6,182,212,0.3)]">{generatedBullets.atsScore}%</span>
-               </div>
+            <div className="bg-white border border-zinc-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900">JD-tailored suggestions</p>
+                  <p className="text-xs text-zinc-500 mt-1">Only changed content is shown. Your resume stays unchanged until you apply a suggestion.</p>
+                </div>
+                <span className="text-xs font-semibold text-cyan-700 bg-cyan-50 px-2.5 py-1.5 rounded-lg">{generatedBullets.tailoredItems.length} items</span>
+              </div>
             </div>
+            {generatedBullets.warnings?.map((warning, index) => (
+              <div key={index} role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">{warning}</div>
+            ))}
 
             {/* SUMMARY OPTIONS */}
             {generatedBullets.summaryOptions && generatedBullets.summaryOptions.length > 0 && (
@@ -265,6 +270,12 @@ export const AnalysisPanel = () => {
                         })}
                     </div>
                 </div>
+            )}
+
+            {!hasGranularData && (!generatedBullets.summaryOptions || generatedBullets.summaryOptions.length === 0) && (
+              <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-600">
+                No changed suggestions are available yet. Your original resume has not been modified. You can reset and try again with the job description's key responsibilities and required skills.
+              </div>
             )}
 
             {/* TAILORED BULLET POINTS */}

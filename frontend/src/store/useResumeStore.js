@@ -368,6 +368,7 @@ export const useResumeStore = create((set, get) => ({
 
   generateBulletOptions: async (jdText, tone = 'impact') => {
     const { activeResume } = get();
+    if (!activeResume?.resumeData) throw new Error('Load a resume before tailoring it.');
     set({ isTailoring: true, generatedBullets: null });
 
     try {
@@ -376,41 +377,72 @@ export const useResumeStore = create((set, get) => ({
         jobDescription: jdText,
         tone
       });
-
       const data = response.data;
-
       if (!data?.success || !data?.tailoredData) {
-        throw new Error('Invalid AI response structure');
+        throw new Error(data?.error || 'The AI returned an invalid tailoring response.');
       }
 
+      const original = activeResume.resumeData;
+      const tailored = data.tailoredData;
       const tailoredItems = [];
-      const customSections = activeResume.resumeData.sections?.filter(s => s.isCustom && s.type === 'list').map(s => s.key) || [];
-      const allKeys = ['experience', 'projects', ...customSections];
+      const sections = (original.sections || []).filter((section) =>
+        section.key === 'experience' || section.key === 'projects' || (section.isCustom && section.type === 'list')
+      );
 
-      allKeys.forEach(key => {
-        if (data.tailoredData[key]) {
-          data.tailoredData[key].forEach(item => {
+      sections.forEach((section) => {
+        const sourceItems = Array.isArray(original[section.key]) ? original[section.key] : [];
+        const proposedItems = Array.isArray(tailored[section.key]) ? tailored[section.key] : [];
+        sourceItems.forEach((sourceItem, index) => {
+          const proposedItem = proposedItems[index];
+          if (!proposedItem) return;
+          const field = sourceItem.description !== undefined ? 'description' : 'bulletPoints';
+          const sourceBullets = Array.isArray(sourceItem[field])
+            ? sourceItem[field].map((bullet) => String(bullet || '').trim()).filter(Boolean)
+            : String(sourceItem[field] || '').split('\\n').map((bullet) => bullet.trim()).filter(Boolean);
+          const proposedBullets = Array.isArray(proposedItem[field])
+            ? proposedItem[field].map((bullet) => String(bullet || '').trim()).filter(Boolean)
+            : String(proposedItem[field] || '').split('\\n').map((bullet) => bullet.trim()).filter(Boolean);
+          const normalize = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+          const changed = proposedBullets.filter((bullet, bulletIndex) =>
+            normalize(bullet) !== normalize(sourceBullets[bulletIndex] || '')
+          );
+          if (changed.length) {
             tailoredItems.push({
-              sectionKey: key,
-              itemTitle: item.company || item.name || item.title || item.institution || 'Role',
-              newSuggestions: item.description || item.bulletPoints || []
+              sectionKey: section.title || section.key,
+              targetSectionKey: section.key,
+              itemTitle: sourceItem.company || sourceItem.name || sourceItem.title || sourceItem.position || 'Resume entry',
+              originalBullets: sourceBullets,
+              newSuggestions: proposedBullets,
+              itemIndex: index
             });
-          });
-        }
+          }
+        });
       });
+
+      const summaryOptions = (Array.isArray(data.summaryOptions) ? data.summaryOptions : [])
+        .filter((option) => typeof option === 'string' && option.trim() && option.trim() !== (original.summary || '').trim());
+      const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+      if (!tailoredItems.length && !summaryOptions.length && !warnings.length) {
+        warnings.push('The AI did not produce any changes. Try again with a more specific job description.');
+      }
+      if (!tailoredItems.length && !summaryOptions.length && data.changedBulletCount === 0) {
+        warnings.push('No resume bullets were materially changed. Your original resume has not been modified.');
+      }
 
       set({
         generatedBullets: {
           success: true,
-          atsScore: data.atsScore || 95,
-          atsScoreBefore: data.atsScoreBefore || 35,
-          summaryOptions: data.summaryOptions || [],
-          tailoredItems
+          summaryOptions,
+          tailoredItems,
+          warnings,
+          changedBulletCount: data.changedBulletCount || 0
         }
       });
-
+      return true;
     } catch (err) {
-      alert('Failed to analyze resume.');
+      const message = err.response?.data?.error || err.message || 'Failed to analyze resume.';
+      alert(message);
+      return false;
     } finally {
       set({ isTailoring: false });
     }

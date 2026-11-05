@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const resumeSaveOperations = new Map();
 let activeResumeRequestSequence = 0;
+let publicResumeRequestSequence = 0;
 
 const flushResumeSave = async (resumeId, get, set) => {
   const operation = resumeSaveOperations.get(resumeId);
@@ -192,7 +193,13 @@ export const useResumeStore = create((set, get) => ({
 
       set({
         activeResume: normalizedResume,
-        documentStyle: { ...get().documentStyle, ...(data.documentStyle || {}) },
+        documentStyle: {
+          fontFamily: 'Times-Roman',
+          fontSize: 10,
+          lineSpacing: 'tight',
+          margins: 'standard',
+          ...(data.documentStyle || {})
+        },
         isLoading: false,
         loadError: null
       });
@@ -210,12 +217,17 @@ export const useResumeStore = create((set, get) => ({
   },
 
   fetchPublicResume: async (slug) => {
-    set({ isLoading: true });
+    const requestSequence = ++publicResumeRequestSequence;
+    set({ publicResume: null, isLoading: true });
     try {
-      const { data } = await api.get(`/resume/public/${slug}`);
-      set({ publicResume: data, isLoading: false });
+      const { data } = await api.get(`/resume/public/${encodeURIComponent(slug)}`);
+      if (requestSequence === publicResumeRequestSequence) {
+        set({ publicResume: data, isLoading: false });
+      }
     } catch (err) {
-      set({ publicResume: null, isLoading: false });
+      if (requestSequence === publicResumeRequestSequence) {
+        set({ publicResume: null, isLoading: false });
+      }
     }
   },
 

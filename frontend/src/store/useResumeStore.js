@@ -5,6 +5,41 @@ import { v4 as uuidv4 } from 'uuid';
 const resumeSaveOperations = new Map();
 let activeResumeRequestSequence = 0;
 
+const flushResumeSave = async (resumeId, get, set) => {
+  const operation = resumeSaveOperations.get(resumeId);
+  if (!operation || operation.inFlight || !operation.dirty) return;
+
+  operation.inFlight = true;
+  operation.timer = null;
+  const savingVersion = operation.version;
+  const payload = operation.payload;
+  operation.dirty = false;
+
+  try {
+    await api.put(`/resume/${resumeId}`, payload);
+    if (operation.version !== savingVersion) {
+      operation.dirty = true;
+    } else if ((get().activeResume?._id || get().activeResume?.id) === resumeId) {
+      set({ isSaving: false, saveError: null });
+    }
+  } catch (error) {
+    console.error('Autosave failed:', error);
+    if (operation.version !== savingVersion) {
+      operation.dirty = true;
+    } else if ((get().activeResume?._id || get().activeResume?.id) === resumeId) {
+      set({
+        isSaving: false,
+        saveError: 'Could not save your latest changes. Check your connection and edit again to retry.'
+      });
+    }
+  } finally {
+    operation.inFlight = false;
+    if (operation.dirty) {
+      operation.timer = setTimeout(() => flushResumeSave(resumeId, get, set), 0);
+    }
+  }
+};
+
 
 export const useResumeStore = create((set, get) => ({
   resumes: [],
@@ -12,6 +47,8 @@ export const useResumeStore = create((set, get) => ({
   publicResume: null,
   isLoading: false,
   isSaving: false,
+  saveError: null,
+  loadError: null,
   isTailoring: false,
   isImporting: false,
   generatedBullets: null,
@@ -292,60 +329,8 @@ export const useResumeStore = create((set, get) => ({
     operation.dirty = true;
     operation.payload = { ...activeResume, documentStyle: { ...documentStyle } };
     if (operation.timer) clearTimeout(operation.timer);
-
-    operation.timer = setTimeout(async () => {
-      operation.timer = null;
-      if (operation.inFlight || !operation.dirty) return;
-
-      operation.inFlight = true;
-      const savingVersion = operation.version;
-      const payload = operation.payload;
-      operation.dirty = false;
-
-      try {
-        await api.put(`/resume/${resumeId}`, payload);
-        if (operation.version === savingVersion && (get().activeResume?._id || get().activeResume?.id) === resumeId) {
-          set({ isSaving: false, saveError: null });
-        }
-      } catch (error) {
-        console.error('Autosave failed:', error);
-        if (operation.version === savingVersion) {
-          operation.dirty = false;
-          if ((get().activeResume?._id || get().activeResume?.id) === resumeId) {
-            set({ isSaving: false, saveError: 'Could not save your latest changes. Please try editing again after checking your connection.' });
-          }
-        }
-      } finally {
-        operation.inFlight = false;
-        if (operation.dirty) {
-          operation.timer = setTimeout(() => {
-            const latest = get().activeResume;
-            if ((latest?._id || latest?.id) !== resumeId) {
-              operation.timer = null;
-              // The pending payload belongs to this resume and is saved independently of the currently open resume.
-              if (!operation.inFlight && operation.dirty) {
-                operation.inFlight = true;
-                const nextVersion = operation.version;
-                const nextPayload = operation.payload;
-                operation.dirty = false;
-                api.put(`/resume/${resumeId}`, nextPayload).then(() => {
-                  if (operation.version === nextVersion) operation.dirty = false;
-                }).catch((error) => {
-                  console.error('Autosave failed:', error);
-                  if (operation.version === nextVersion) operation.dirty = false;
-                }).finally(() => {
-                  operation.inFlight = false;
-                });
-              }
-              return;
-            }
-            get().triggerSave();
-          }, 0);
-        }
-      }
-    }, 1500);
+    operation.timer = setTimeout(() => flushResumeSave(resumeId, get, set), 1500);
   },
-
   organizeSkillsAi: async (jdText) => {
     const { activeResume, updateResumeData } = get();
     const currentSkills = activeResume?.resumeData?.skills || [];

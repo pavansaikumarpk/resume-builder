@@ -344,24 +344,27 @@ const optimizeArrayData = async (items, jd, sectionName) => {
   mapped.forEach((entry) => {
     const result = parsed.entries.find((candidate) => candidate._index === entry._index);
     if (!result || !Array.isArray(result.bullets)) throw new Error('AI omitted ' + sectionName + ' entry ' + (entry._index + 1) + '.');
+    if (result.bullets.length !== entry.bullets.length) {
+      throw new Error('AI returned ' + result.bullets.length + ' decisions for ' + entry.bullets.length + ' source bullets in ' + sectionName + ' entry ' + (entry._index + 1) + '.');
+    }
     const entryActions = [];
-    entry.bullets.forEach((original, bulletIndex) => {
+    entry.bullets.forEach((sourceText, bulletIndex) => {
       const decision = result.bullets.find((candidate) => Number(candidate.bulletIndex) === bulletIndex);
       if (!decision || !['keep', 'replace', 'remove'].includes(decision.action)) {
         throw new Error('AI returned an incomplete decision for ' + sectionName + ' bullet ' + (bulletIndex + 1) + '.');
       }
       reviewedCount += 1;
       const suggestedText = typeof decision.text === 'string' ? decision.text.trim() : '';
-      if (decision.action === 'replace' && (!suggestedText || suggestedText.toLowerCase() === original.toLowerCase())) {
-        entryActions.push({ bulletIndex, action: 'keep', original, text: original, reason: 'No meaningful rewrite was produced.' });
+      if (decision.action === 'replace' && (!suggestedText || suggestedText.toLowerCase() === sourceText.toLowerCase())) {
+        entryActions.push({ bulletIndex, action: 'keep', original: sourceText, text: sourceText, reason: 'No meaningful rewrite was produced.' });
         return;
       }
       if (decision.action === 'replace' || decision.action === 'remove') changedCount += 1;
       entryActions.push({
         bulletIndex,
         action: decision.action,
-        original,
-        text: decision.action === 'replace' ? suggestedText : (decision.action === 'keep' ? original : ''),
+        original: sourceText,
+        text: decision.action === 'replace' ? suggestedText : (decision.action === 'keep' ? sourceText : ''),
         reason: String(decision.reason || '').slice(0, 220)
       });
     });

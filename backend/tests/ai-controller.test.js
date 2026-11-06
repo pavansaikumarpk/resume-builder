@@ -238,3 +238,67 @@ test('rejects duplicate and out-of-range bullet indexes instead of silently acce
     assert.match(payload.warnings[0], /duplicate or invalid bullet indexes/);
   });
 });
+
+
+test('does not invent a summary when the resume contains no verified facts', async () => {
+  let calls = 0;
+  await withAxiosMock(async () => {
+    calls += 1;
+    throw new Error('AI should not be called without source facts');
+  }, async () => {
+    const response = makeResponse();
+    await magicTailor({
+      body: {
+        jobDescription: 'A sufficiently long target job description',
+        resumeData: { summary: '', experience: [], projects: [], skills: [], education: [], certifications: [] }
+      }
+    }, response.res);
+    const { statusCode, payload } = response.read();
+    assert.equal(statusCode, 200);
+    assert.equal(calls, 0);
+    assert.deepEqual(payload.summaryOptions, []);
+    assert.equal(payload.warnings.length, 0);
+  });
+});
+
+test('rejects duplicate or missing resume entry indexes from the model', async () => {
+  await withAxiosMock(async (_url, body) => {
+    const prompt = body.messages[1].content;
+    if (prompt.includes('VERIFIED RESUME FACTS')) {
+      return { data: { choices: [{ message: { content: JSON.stringify({ options: ['Summary'] }) } }] } };
+    }
+    return {
+      data: {
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              entries: [
+                { _index: 0, bullets: [{ bulletIndex: 0, action: 'keep', text: 'First' }], additions: [] },
+                { _index: 0, bullets: [{ bulletIndex: 0, action: 'keep', text: 'Second' }], additions: [] }
+              ]
+            })
+          }
+        }]
+      }
+    };
+  }, async () => {
+    const response = makeResponse();
+    await magicTailor({
+      body: {
+        jobDescription: 'A sufficiently long target job description',
+        resumeData: {
+          summary: 'Original summary',
+          experience: [
+            { company: 'Acme', description: ['First'] },
+            { company: 'Beta', description: ['Second'] }
+          ]
+        }
+      }
+    }, response.res);
+    const { statusCode, payload } = response.read();
+    assert.equal(statusCode, 200);
+    assert.equal(payload.bulletActions.length, 0);
+    assert.equal(payload.warnings.length, 1);
+    assert.match(payload.warnings[0], /duplicate, missing, or invalid entry indexes/);
+  });
+});

@@ -222,7 +222,7 @@ const optimizeArrayDataOnce = async (items, jd, sectionName, candidateContext = 
     '- Every input bullet must appear exactly once, identified by its original bullet index.',
     '- Return valid JSON only, no markdown fences or commentary.',
     '',
-    'Schema: {"entries":[{"_index":0,"bullets":[{"bulletIndex":0,"action":"keep|modify|remove","text":"original or replacement text; empty for remove","reason":"short reason"}],"additions":[{"text":"new evidence-backed bullet","reason":"why it helps this JD"}]}]}'
+    'Schema: {"entries":[{"_index":0,"bullets":[{"bulletIndex":0,"action":"keep|modify|remove","text":"original or modified text; empty for remove","reason":"short reason"}],"additions":[{"text":"new evidence-backed bullet","reason":"why it helps this JD"}]}]}'
   ].join('\n');
 
   const prompt = 'JOB DESCRIPTION (the only target for this tailoring run):\n' + jd +

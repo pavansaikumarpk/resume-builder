@@ -286,146 +286,158 @@ const organizeSkillsEngine = async (skillsArray, jd) => {
 };
 
 const normalizeBulletList = (value) => {
-  if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean);
-  if (typeof value === 'string') return value.split(/\r?\n/).map((item) => item.replace(/^\s*[•*-]\s*/, '').trim()).filter(Boolean);
-  return [];
+  const values = Array.isArray(value) ? value : (typeof value === 'string' ? value.split(/\r?\n/) : []);
+  return values.map((item) => {
+    if (typeof item === 'string') return item.trim().replace(/^\s*[•*-]\s*/, '');
+    if (item && typeof item === 'object') return String(item.text || item.description || item.content || item.name || '').trim();
+    return '';
+  }).filter(Boolean);
 };
 
 const optimizeArrayData = async (items, jd, sectionName) => {
-  if (!Array.isArray(items) || !items.length) return { items: items || [], changedCount: 0, reviewedCount: 0, failed: false };
+  if (!Array.isArray(items) || !items.length) return { items: items || [], actions: [], changedCount: 0, reviewedCount: 0 };
 
   const mapped = items.map((item, index) => ({
     _index: index,
-    title: item.title || item.company || item.name || item.position || sectionName,
-    role: item.position || item.jobTitle || '',
-    bulletField: item.description !== undefined ? 'description' : (item.bulletPoints !== undefined ? 'bulletPoints' : 'text'),
+    title: item.title || item.company || item.name || item.position || item.institution || (sectionName + ' entry ' + (index + 1)),
+    role: item.position || item.jobTitle || item.degree || '',
     bullets: normalizeBulletList(item.description ?? item.bulletPoints ?? item.text)
   })).filter((item) => item.bullets.length);
 
-  if (!mapped.length) return { items, changedCount: 0, reviewedCount: 0, failed: false, reason: 'No source bullets were available to tailor.' };
+  if (!mapped.length) return { items, actions: [], changedCount: 0, reviewedCount: 0 };
 
-  const systemInstruction = `You are an evidence-grounded resume tailoring specialist.
-Tailor the candidate's existing resume bullets to the job description supplied in this request.
-Rules:
-- Evaluate EVERY source bullet independently against THIS job description. Do not stop after the strongest or easiest bullets.
-- Attempt a rewrite for every bullet, but keep the exact original wording if no truthful, material improvement would make it more relevant, clearer, or stronger for this job.
-- Keep bullets that are already strong and relevant unchanged. Do not rewrite merely to create the appearance of work.
-- If a bullet has no truthful connection to the target role and cannot be improved without changing its meaning, return it unchanged.
-- Preserve the candidate's actual responsibilities, tools, technologies, scope and results.
-- Never invent employers, projects, tools, certifications, metrics, percentages, scale, leadership, outcomes, or experience.
-- Do not copy job-description requirements as if the candidate has done them.
-- A changed bullet must be materially better for this specific job, concise, ATS-readable, and start with a strong action verb where appropriate.
-- Return exactly one result for every input bullet, in the same item and bullet order. Use the exact source text for any bullet you decide not to improve.
-- The job description may describe ANY industry, role, seniority, or technology. Do not assume a particular company, job family, or technology stack.
-Return only valid JSON in this exact schema:
-{ "optimized": [ { "_index": 0, "bullets": ["rewritten or unchanged original bullet"] } ] }`;
+  const systemInstruction = [
+    'You are a rigorous, high-quality resume editor and job-description analyst.',
+    'Your job is to make the candidate resume as strong and relevant as truthfully possible for the exact job description supplied.',
+    '',
+    'For EVERY candidate bullet, make one explicit decision:',
+    'KEEP: The bullet is already relevant and strong enough. Keep its wording exactly.',
+    'REPLACE: Relevant evidence exists, but focus, clarity, specificity, or impact can be materially improved for this job. Write the improved bullet.',
+    'REMOVE: The bullet is irrelevant, redundant, misleading, or too weak to improve truthfully. Recommend removal, but never delete automatically.',
+    '',
+    'Also suggest ADDITIONS only when a meaningful resume point can be assembled from facts explicitly present elsewhere in the supplied candidate data.',
+    'Critical rules:',
+    '- Actually compare candidate evidence with the job responsibilities and qualifications. Do not just paraphrase the original.',
+    '- Do not return every bullet as KEEP to avoid doing the work. Actively look for truthful improvements.',
+    '- Do not change a bullet merely to insert keywords. A replacement must be better for THIS job.',
+    '- Never invent technologies, tools, metrics, scale, outcomes, responsibilities, employers, qualifications, or years of experience.',
+    '- Preserve factual meaning. A bullet may be unrelated to the JD; if it cannot be honestly improved, recommend REMOVE.',
+    '- A new addition must be directly supported by supplied resume facts. If none exists, return an empty additions array.',
+    '- Use concise, strong, ATS-readable language. Avoid generic claims and keyword stuffing.',
+    '- Every input bullet must appear exactly once, identified by its original bullet index.',
+    '- Return valid JSON only, no markdown fences or commentary.',
+    '',
+    'Schema: {"entries":[{"_index":0,"bullets":[{"bulletIndex":0,"action":"keep|replace|remove","text":"original or replacement text; empty for remove","reason":"short reason"}],"additions":[{"text":"new evidence-backed bullet","reason":"why it helps this JD"}]}]}'
+  ].join('\n');
 
-  const prompt = `TARGET JOB DESCRIPTION:
-${jd}
+  const prompt = 'JOB DESCRIPTION (the only target for this tailoring run):\n' + jd +
+    '\n\nCANDIDATE RESUME FACTS:\n' + JSON.stringify(mapped) +
+    '\n\nReview all entries and every bullet. Return a decision for every bullet and only evidence-backed additions. The company and role can be from any industry; do not assume a specific company or technology.';
 
-CANDIDATE SOURCE DATA (the only source of candidate facts):
-${JSON.stringify(mapped)}
-
-Evaluate every bullet. Rewrite only those with a truthful, material improvement for this job; return all other bullets exactly as written.`;
-
-  const raw = await callAIEngineWithRetry(prompt, systemInstruction, { maxTokens: 5000, temperature: 0.2 });
+  const raw = await callAIEngineWithRetry(prompt, systemInstruction, { maxTokens: 4200, temperature: 0.25 });
   const parsed = extractCleanJSON(raw);
-  if (!Array.isArray(parsed.optimized)) throw new Error(`AI returned an invalid ${sectionName} response.`);
+  if (!Array.isArray(parsed.entries)) throw new Error('AI returned an invalid ' + sectionName + ' action plan.');
 
+  const actions = [];
   let changedCount = 0;
-  const optimizedItems = items.map((original, index) => {
-    const source = mapped.find((entry) => entry._index === index);
-    if (!source) return original;
-    const result = parsed.optimized.find((entry) => entry._index === index);
-    const bullets = normalizeBulletList(result?.bullets);
-    if (bullets.length !== source.bullets.length) {
-      throw new Error(`AI returned an incomplete bullet set for ${sectionName} item ${index + 1}.`);
-    }
-    const sourceBullets = source.bullets;
-    const changedHere = bullets.filter((bullet, bulletIndex) =>
-      bullet.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() !==
-      sourceBullets[bulletIndex].toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-    );
-    if (!changedHere.length) return original;
-    changedCount += changedHere.length;
-    return { ...original, [source.bulletField]: bullets };
+  let reviewedCount = 0;
+  mapped.forEach((entry) => {
+    const result = parsed.entries.find((candidate) => candidate._index === entry._index);
+    if (!result || !Array.isArray(result.bullets)) throw new Error('AI omitted ' + sectionName + ' entry ' + (entry._index + 1) + '.');
+    const entryActions = [];
+    entry.bullets.forEach((original, bulletIndex) => {
+      const decision = result.bullets.find((candidate) => Number(candidate.bulletIndex) === bulletIndex);
+      if (!decision || !['keep', 'replace', 'remove'].includes(decision.action)) {
+        throw new Error('AI returned an incomplete decision for ' + sectionName + ' bullet ' + (bulletIndex + 1) + '.');
+      }
+      reviewedCount += 1;
+      const suggestedText = typeof decision.text === 'string' ? decision.text.trim() : '';
+      if (decision.action === 'replace' && (!suggestedText || suggestedText.toLowerCase() === original.toLowerCase())) {
+        entryActions.push({ bulletIndex, action: 'keep', original, text: original, reason: 'No meaningful rewrite was produced.' });
+        return;
+      }
+      if (decision.action === 'replace' || decision.action === 'remove') changedCount += 1;
+      entryActions.push({
+        bulletIndex,
+        action: decision.action,
+        original,
+        text: decision.action === 'replace' ? suggestedText : (decision.action === 'keep' ? original : ''),
+        reason: String(decision.reason || '').slice(0, 220)
+      });
+    });
+    const additions = Array.isArray(result.additions)
+      ? result.additions.filter((item) => typeof item?.text === 'string' && item.text.trim()).slice(0, 3)
+          .map((item) => ({ text: item.text.trim(), reason: String(item.reason || '').slice(0, 220) }))
+      : [];
+    changedCount += additions.length;
+    actions.push({ sectionIndex: entry._index, itemTitle: entry.title, bullets: entryActions, additions });
   });
-
-  return {
-    items: optimizedItems,
-    changedCount,
-    reviewedCount: mapped.reduce((total, item) => total + item.bullets.length, 0),
-    failed: false
-  };
-};
-// ============================================================================
+  return { items, actions, changedCount, reviewedCount };
+};// ============================================================================
 // ENDPOINTS
 // ============================================================================
 
 const magicTailor = async (req, res) => {
   const { jobDescription, resumeData } = req.body;
-  if (!jobDescription || !resumeData) return res.status(400).json({ success: false, error: "Insufficient parameters." });
-
+  if (!jobDescription || !String(jobDescription).trim() || !resumeData) {
+    return res.status(400).json({ success: false, error: "Paste a job description and load a resume first." });
+  }
   try {
-    const customListSections = (resumeData.sections || []).filter((section) =>
-      section.isCustom && (section.type === 'list' || section.type === 'bullets')
+    const customSections = (resumeData.sections || []).filter((section) =>
+      section.isCustom && ['list', 'bullets'].includes(section.type)
     );
-    const customPromises = customListSections.map((section) =>
-      optimizeArrayData(resumeData[section.key] || [], jobDescription, section.title)
-    );
-
-    const allPromises = [
-      optimizeSummary(resumeData.summary, jobDescription),
-      optimizeArrayData(resumeData.experience, jobDescription, 'Work Experience'),
-      optimizeArrayData(resumeData.projects, jobDescription, 'Projects'),
-      organizeSkillsEngine(resumeData.skills, jobDescription),
-      ...customPromises
+    const sectionTasks = [
+      { key: 'experience', title: 'Work Experience', items: resumeData.experience || [] },
+      { key: 'projects', title: 'Projects', items: resumeData.projects || [] },
+      ...customSections.map((section) => ({ key: section.key, title: section.title, items: resumeData[section.key] || [] }))
     ];
-    const results = await Promise.allSettled(allPromises);
+    const [summaryResult, ...sectionResults] = await Promise.allSettled([
+      optimizeSummary(resumeData.summary, jobDescription),
+      ...sectionTasks.map((section) => optimizeArrayData(section.items, jobDescription, section.title))
+    ]);
     const warnings = [];
-    const readResult = (result, fallback, label) => {
-      if (result.status === 'fulfilled') return result.value;
-      warnings.push(`${label} could not be tailored: ${result.reason?.message || 'AI request failed'}`);
-      return fallback;
-    };
+    let summaryOptions = [resumeData.summary].filter(Boolean);
+    if (summaryResult.status === 'fulfilled') summaryOptions = summaryResult.value;
+    else warnings.push('Summary could not be tailored: ' + (summaryResult.reason?.message || 'AI request failed'));
 
-    const summaryOptions = readResult(results[0], [resumeData.summary].filter(Boolean), 'Summary');
-    const experienceResult = readResult(results[1], { items: resumeData.experience || [], changedCount: 0, reviewedCount: 0 }, 'Experience');
-    const projectsResult = readResult(results[2], { items: resumeData.projects || [], changedCount: 0, reviewedCount: 0 }, 'Projects');
-    const skillsResult = readResult(results[3], resumeData.skills || [], 'Skills');
-    const tailoredData = {
-      ...resumeData,
-      summary: summaryOptions[0] || resumeData.summary,
-      experience: experienceResult.items,
-      projects: projectsResult.items,
-      skills: skillsResult
-    };
-    customListSections.forEach((section, index) => {
-      const result = readResult(results[4 + index], {
-        items: resumeData[section.key] || [],
-        changedCount: 0,
-        reviewedCount: 0
-      }, section.title);
-      tailoredData[section.key] = result.items;
+    const bulletActions = [];
+    let reviewedBulletCount = 0;
+    let changedBulletCount = 0;
+    sectionResults.forEach((result, index) => {
+      const section = sectionTasks[index];
+      if (result.status !== 'fulfilled') {
+        warnings.push(section.title + ' could not be analyzed: ' + (result.reason?.message || 'AI request failed'));
+        return;
+      }
+      reviewedBulletCount += result.value.reviewedCount;
+      changedBulletCount += result.value.changedCount;
+      result.value.actions.forEach((entry) => {
+        bulletActions.push({
+          sectionKey: section.key,
+          sectionTitle: section.title,
+          itemIndex: entry.sectionIndex,
+          itemTitle: entry.itemTitle,
+          bullets: entry.bullets,
+          additions: entry.additions
+        });
+      });
     });
-
-    const customResults = customListSections.map((section, index) => results[4 + index]);
-    const changedBulletCount = experienceResult.changedCount + projectsResult.changedCount +
-      customResults.reduce((total, result) => total + (result.status === 'fulfilled' ? result.value.changedCount : 0), 0);
-    const reviewedBulletCount = experienceResult.reviewedCount + projectsResult.reviewedCount +
-      customResults.reduce((total, result) => total + (result.status === 'fulfilled' ? result.value.reviewedCount : 0), 0);
-
     return res.status(200).json({
       success: true,
-      tailoredData,
+      tailoredData: resumeData,
       summaryOptions,
+      bulletActions,
       changedBulletCount,
       reviewedBulletCount,
-      warnings
+      warnings,
+      atsScore: null
     });
   } catch (error) {
-    console.error("Pipeline Failure:", error);
-    return res.status(500).json({ success: false, error: "Optimization pipeline failure." });
+    console.error("JD tailoring failure:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || "AI tailoring failed. No resume content was changed."
+    });
   }
 };
 

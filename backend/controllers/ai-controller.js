@@ -331,7 +331,8 @@ const optimizeArrayData = async (items, jd, sectionName) => {
   ].join('\n');
 
   const prompt = 'JOB DESCRIPTION (the only target for this tailoring run):\n' + jd +
-    '\n\nCANDIDATE RESUME FACTS:\n' + JSON.stringify(mapped) +
+    '\n\nADDITIONAL VERIFIED RESUME CONTEXT (use only to support relevant additions; do not infer unlisted experience):\n' + JSON.stringify(candidateContext) +
+    '\n\nCANDIDATE RESUME FACTS FOR THIS SECTION:\n' + JSON.stringify(mapped) +
     '\n\nReview all entries and every bullet. Return a decision for every bullet and only evidence-backed additions. The company and role can be from any industry; do not assume a specific company or technology.';
 
   const raw = await callAIEngineWithRetry(prompt, systemInstruction, { maxTokens: 4200, temperature: 0.25 });

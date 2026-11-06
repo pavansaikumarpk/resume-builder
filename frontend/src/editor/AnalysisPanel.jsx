@@ -82,7 +82,7 @@
 //             </div>
 //         )}
 
-//         {generatedBullets && hasGranularData && (
+//         {generatedBullets && (
 //           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             
 //             <div className="bg-white border rounded-xl p-4 flex justify-between items-center shadow-sm">
@@ -133,7 +133,7 @@
 //                               <span className="absolute top-4 left-3 w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
 //                               <p className="text-sm text-zinc-800 leading-relaxed pl-3">{bullet}</p>
 //                               <button 
-//                                   onClick={() => handleApplyBullet(itemGroup.sectionKey, itemGroup.itemTitle, bullet, uniqueId)}
+//                                   onClick={() => handleApplyBullet(itemGroup.targetSectionKey || itemGroup.sectionKey, itemGroup.itemTitle, bullet, uniqueId)}
 //                                   className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all ${isApplied ? 'bg-emerald-50 text-emerald-600' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-900 hover:text-white shadow-sm opacity-0 group-hover:opacity-100'}`}
 //                               >
 //                                   {isApplied ? <Check size={16} /> : <Plus size={16} />}
@@ -163,7 +163,7 @@ import { useResumeStore } from '../store/useResumeStore';
 import { Sparkles, Loader2, Plus, RotateCcw, Check } from 'lucide-react';
 
 export const AnalysisPanel = () => {
-  const { generateBulletOptions, isTailoring, generatedBullets, appendBulletToResume, updateResumeData, activeResume, clearGeneratedBullets } = useResumeStore();
+  const { generateBulletOptions, isTailoring, generatedBullets, applyTailoredBullet, updateResumeData, activeResume, clearGeneratedBullets } = useResumeStore();
   const [jdText, setJdText] = useState('');
   const [appliedItems, setAppliedItems] = useState(new Set());
 
@@ -184,8 +184,18 @@ export const AnalysisPanel = () => {
     setAppliedItems(prev => new Set(prev).add(`summary-${idx}`));
   };
 
-  const handleApplyBullet = (sectionKey, itemTitle, bullet, uniqueId) => {
-    appendBulletToResume(sectionKey, itemTitle, bullet);
+  const handleApplyBullet = (itemGroup, suggestion, uniqueId) => {
+    const applied = applyTailoredBullet(
+      itemGroup.targetSectionKey,
+      itemGroup.itemIndex,
+      suggestion.bulletIndex,
+      suggestion.original,
+      suggestion.proposed
+    );
+    if (!applied) {
+      alert('This original bullet has changed since the suggestions were generated. Reset and run the Copilot again to avoid overwriting your latest edit.');
+      return;
+    }
     setAppliedItems(prev => new Set(prev).add(uniqueId));
   };
 
@@ -231,16 +241,24 @@ export const AnalysisPanel = () => {
             </div>
         )}
 
-        {generatedBullets && hasGranularData && (
+        {generatedBullets && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative z-0">
             
-            <div className="bg-white border rounded-xl p-4 flex justify-between items-center shadow-md relative z-10">
-               <span className="text-sm font-medium">Potential ATS Match</span>
-               <div className="flex items-center gap-2">
-                 <span className="text-lg font-bold text-zinc-400 line-through">{generatedBullets.atsScoreBefore}%</span>
-                 <span className="text-2xl font-black text-[#06b6d4] drop-shadow-[0_0_10px_rgba(6,182,212,0.3)]">{generatedBullets.atsScore}%</span>
-               </div>
+            <div className="bg-white border border-zinc-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900">JD-tailored suggestions</p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Reviewed {generatedBullets.reviewedBulletCount || 0} bullets. Showing only the {generatedBullets.changedBulletCount || 0} that could be materially improved for this job.
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-1">Nothing is changed in your resume until you apply a suggestion.</p>
+                </div>
+                <span className="text-xs font-semibold text-cyan-700 bg-cyan-50 px-2.5 py-1.5 rounded-lg">{generatedBullets.changedBulletCount || 0} to improve</span>
+              </div>
             </div>
+            {generatedBullets.warnings?.map((warning, index) => (
+              <div key={index} role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">{warning}</div>
+            ))}
 
             {/* SUMMARY OPTIONS */}
             {generatedBullets.summaryOptions && generatedBullets.summaryOptions.length > 0 && (
@@ -267,6 +285,12 @@ export const AnalysisPanel = () => {
                 </div>
             )}
 
+            {!hasGranularData && (!generatedBullets.summaryOptions || generatedBullets.summaryOptions.length === 0) && (
+              <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-600">
+                The Copilot reviewed {generatedBullets.reviewedBulletCount || 0} resume bullets and found none that could be made materially better for this job without weakening accuracy. Your original resume remains unchanged.
+              </div>
+            )}
+
             {/* TAILORED BULLET POINTS */}
             {generatedBullets.tailoredItems.map((itemGroup, idx) => (
               <div key={idx} className="space-y-3 relative z-0">
@@ -274,19 +298,32 @@ export const AnalysisPanel = () => {
                       {itemGroup.sectionKey}: {itemGroup.itemTitle}
                   </h3>
                   
-                  {itemGroup.newSuggestions?.map((bullet, bIdx) => {
-                      const uniqueId = `new-${idx}-${bIdx}`;
+                  {itemGroup.suggestions?.map((suggestion, bIdx) => {
+                      const uniqueId = `replace-${itemGroup.targetSectionKey}-${itemGroup.itemIndex}-${suggestion.bulletIndex}`;
                       const isApplied = appliedItems.has(uniqueId);
                       return (
-                          <div key={bIdx} className="p-4 bg-white border border-zinc-200 rounded-xl hover:border-cyan-200 hover:shadow-md transition-all group relative pr-14 cursor-default relative z-0">
-                              <span className="absolute top-4 left-3 w-1.5 h-1.5 rounded-full bg-[#06b6d4] shadow-[0_0_8px_rgba(6,182,212,0.6)]"></span>
-                              <p className="text-sm text-zinc-800 leading-relaxed pl-3">{bullet}</p>
-                              <button 
-                                  onClick={() => handleApplyBullet(itemGroup.sectionKey, itemGroup.itemTitle, bullet, uniqueId)}
-                                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all ${isApplied ? 'bg-cyan-50 text-[#06b6d4]' : 'bg-zinc-100 text-zinc-600 hover:bg-[#06b6d4] hover:text-white shadow-sm opacity-0 group-hover:opacity-100'}`}
-                              >
-                                  {isApplied ? <Check size={16} /> : <Plus size={16} />}
-                              </button>
+                          <div key={uniqueId} className="p-4 bg-white border border-zinc-200 rounded-xl hover:border-cyan-200 transition-all relative z-0">
+                              <div className="space-y-2 pr-1">
+                                <div>
+                                  <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1">Original</p>
+                                  <p className="text-xs text-zinc-500 leading-relaxed line-through">{suggestion.original}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700 mb-1">Improved for this job</p>
+                                  <p className="text-sm text-zinc-800 leading-relaxed">{suggestion.proposed}</p>
+                                </div>
+                              </div>
+                              <div className="flex justify-end mt-3">
+                                <button
+                                  type="button"
+                                  disabled={isApplied}
+                                  onClick={() => handleApplyBullet(itemGroup, suggestion, uniqueId)}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isApplied ? 'bg-cyan-50 text-cyan-700 cursor-default' : 'bg-zinc-900 text-white hover:bg-cyan-700'}`}
+                                >
+                                  <Check size={14} />
+                                  {isApplied ? 'Applied' : 'Replace original'}
+                                </button>
+                              </div>
                           </div>
                       );
                   })}

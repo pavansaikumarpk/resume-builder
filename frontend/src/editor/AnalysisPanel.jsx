@@ -263,7 +263,7 @@ export const AnalysisPanel = () => {
               {isTailoring ? 'Reviewing every resume point...' : 'Analyze and improve resume'}
             </button>
             <p className="text-[11px] text-zinc-500 leading-relaxed">
-              The AI will recommend keeping, replacing, removing, or adding points. Nothing changes until you choose an action. No ATS score is fabricated.
+              The AI decides whether each point should stay, improve, be removed, or whether a missing point can be added. Nothing changes without your approval. No ATS score is fabricated.
             </p>
           </div>
         )}
@@ -340,12 +340,14 @@ export const AnalysisPanel = () => {
                       <div className="flex flex-wrap gap-2 justify-end">
                         {bullet.action === 'replace' && (
                           <button disabled={applied} onClick={() => handleReplace(group, bullet, id)} className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-700 hover:bg-cyan-800 text-white px-3 py-2 text-xs font-semibold disabled:opacity-50">
-                            <Check size={13} /> {applied ? 'Replaced' : 'Replace point'}
+                            <Check size={13} /> {applied ? 'Updated' : 'Apply improvement'}
                           </button>
                         )}
-                        <button disabled={applied} onClick={() => handleRemove(group, bullet, id)} className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3 py-2 text-xs font-semibold disabled:opacity-50">
-                          <Trash2 size={13} /> {applied && bullet.action === 'remove' ? 'Removed' : 'Remove point'}
-                        </button>
+                        {bullet.action === 'remove' && (
+                          <button disabled={applied} onClick={() => handleRemove(group, bullet, id)} className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                            <Trash2 size={13} /> {applied ? 'Removed' : 'Remove point'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

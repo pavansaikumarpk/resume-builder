@@ -158,7 +158,7 @@ test('isolates malformed section output to a warning while preserving valid summ
     }, response.res);
     const { statusCode, payload } = response.read();
     assert.equal(statusCode, 200);
-    assert.equal(calls, 3);
+    assert.equal(calls, 4, 'the malformed section is retried once before being isolated as a warning');
     assert.equal(payload.bulletActions.length, 1);
     assert.equal(payload.bulletActions[0].sectionKey, 'projects');
     assert.equal(payload.reviewedBulletCount, 1);
@@ -377,4 +377,193 @@ test('does not switch Groq models for invalid API credentials', async () => {
     assert.equal(response.read().payload.warnings.length, 1);
     assert.equal(calls, 1);
   });
+});
+
+
+test('sets GPT-OSS JSON reasoning format and sends the supported token limit parameter', async () => {
+  let sentBody;
+  await withAxiosMock(async (_url, body) => {
+    sentBody = body;
+    return { data: { choices: [{ message: { content: JSON.stringify({ options: ['Evidence-based summary'] }) } }] } };
+  }, async () => {
+    const response = makeResponse();
+    await magicTailor({
+      body: {
+        jobDescription: 'Python backend engineer building APIs',
+        resumeData: { summary: 'Python developer', experience: [], projects: [], skills: ['Python'] }
+      }
+    }, response.res);
+    assert.equal(response.read().statusCode, 200);
+  });
+  assert.equal(sentBody.temperature, 0.2);
+  assert.equal(sentBody.response_format.type, 'json_object');
+  assert.equal(sentBody.reasoning_format, 'hidden');
+  assert.equal(sentBody.max_completion_tokens, 900);
+  assert.equal(Object.hasOwn(sentBody, 'max_tokens'), false);
+});
+
+test('caps evidence-backed additions at four total bullets per resume entry', async () => {
+  await withAxiosMock(async (_url, body) => {
+    const prompt = body.messages[1].content;
+    if (prompt.includes('VERIFIED RESUME FACTS')) {
+      return { data: { choices: [{ message: { content: JSON.stringify({ options: ['Summary'] }) } }] } };
+    }
+    const mapped = readMappedEntries(prompt);
+    const entries = mapped.map((entry) => ({
+      _index: entry._index,
+      bullets: entry.bullets.map((text, bulletIndex) => ({ bulletIndex, action: 'keep', text, reason: 'Relevant.' })),
+      additions: [
+        { text: 'Verified achievement A', reason: 'Supported.' },
+        { text: 'Verified achievement B', reason: 'Supported.' },
+        { text: 'Verified achievement C', reason: 'Supported.' }
+      ]
+    }));
+    return { data: { choices: [{ message: { content: JSON.stringify({ entries }) } }] } };
+  }, async () => {
+    const response = makeResponse();
+    await magicTailor({
+      body: {
+        jobDescription: 'A sufficiently long target job description',
+        resumeData: { summary: 'Summary', experience: [{ company: 'Acme', description: ['First', 'Second'] }] }
+      }
+    }, response.res);
+    const { statusCode, payload } = response.read();
+    assert.equal(statusCode, 200);
+    assert.equal(payload.bulletActions[0].additions.length, 2);
+  });
+});
+
+test('retries a malformed bullet plan once with correction feedback', async () => {
+  let sectionCalls = 0;
+  await withAxiosMock(async (_url, body) => {
+    const prompt = body.messages[1].content;
+    if (prompt.includes('VERIFIED RESUME FACTS')) {
+      return { data: { choices: [{ message: { content: JSON.stringify({ options: ['Summary'] }) } }] } };
+    }
+    sectionCalls += 1;
+    if (sectionCalls === 1) {
+      const malformed = { entries: [{ _index: 0, bullets: [{ bulletIndex: 0, action: 'keep', text: 'First' }], additions: [] }] };
+      return { data: { choices: [{ message: { content: JSON.stringify(malformed) } }] } };
+    }
+    assert.match(prompt, /previous response failed validation/i);
+    return { data: { choices: [{ message: { content: validSectionResponse(prompt) } }] } };
+  }, async () => {
+    const response = makeResponse();
+    await magicTailor({
+      body: {
+        jobDescription: 'A sufficiently long target job description',
+        resumeData: { summary: 'Summary', experience: [{ company: 'Acme', description: ['First', 'Second'] }] }
+      }
+    }, response.res);
+    const { statusCode, payload } = response.read();
+    assert.equal(statusCode, 200);
+    assert.equal(sectionCalls, 2);
+    assert.equal(payload.bulletActions.length, 1);
+    assert.equal(payload.warnings.length, 0);
+  });
+});
+
+test('AI prompt treats transferable experience conservatively instead of removing by technology mismatch', async () => {
+  let systemPrompt = '';
+  await withAxiosMock(async (_url, body) => {
+    const prompt = body.messages[1].content;
+    if (prompt.includes('VERIFIED RESUME FACTS')) {
+      return { data: { choices: [{ message: { content: JSON.stringify({ options: ['Summary'] }) } }] } };
+    }
+    systemPrompt = body.messages[0].content;
+    return { data: { choices: [{ message: { content: validSectionResponse(prompt) } }] } };
+  }, async () => {
+    const response = makeResponse();
+    await magicTailor({
+      body: {
+        jobDescription: 'Python backend engineer',
+        resumeData: { summary: 'Engineer', experience: [{ company: 'DRDO', description: ['Designed Verilog logic modules'] }] }
+      }
+    }, response.res);
+    assert.equal(response.read().statusCode, 200);
+  });
+  assert.match(systemPrompt, /Do not remove merely because its technology differs/i);
+});
+
+test('mixed decisions keep one action per source bullet and additions remain separate', async () => {
+  await withAxiosMock(async (_url, body) => {
+    const prompt = body.messages[1].content;
+    if (prompt.includes('VERIFIED RESUME FACTS')) {
+      return { data: { choices: [{ message: { content: JSON.stringify({ options: ['Summary'] }) } }] } };
+    }
+    const mapped = readMappedEntries(prompt);
+    const entries = mapped.map((entry) => ({
+      _index: entry._index,
+      bullets: [
+        { bulletIndex: 0, action: 'keep', text: entry.bullets[0], reason: 'Strong.' },
+        { bulletIndex: 1, action: 'replace', text: 'Improved truthful point', reason: 'Clearer.' },
+        { bulletIndex: 2, action: 'remove', text: '', reason: 'Unrelated.' }
+      ],
+      additions: [{ text: 'Verified missing achievement', reason: 'Supported elsewhere.' }]
+    }));
+    return { data: { choices: [{ message: { content: JSON.stringify({ entries }) } }] } };
+  }, async () => {
+    const response = makeResponse();
+    await magicTailor({
+      body: {
+        jobDescription: 'Python backend engineer with API experience',
+        resumeData: { summary: 'Engineer', experience: [{ company: 'Acme', description: ['Built API', 'Improved API', 'Unrelated circuit'] }] }
+      }
+    }, response.res);
+    const { statusCode, payload } = response.read();
+    assert.equal(statusCode, 200);
+    assert.deepEqual(payload.bulletActions[0].bullets.map((item) => item.action), ['keep', 'replace', 'remove']);
+    assert.equal(payload.bulletActions[0].additions.length, 1);
+  });
+});
+
+
+test('reports Groq HTTP 400 provider message instead of Axios generic text', async () => {
+  let calls = 0;
+  await withAxiosMock(async () => {
+    calls += 1;
+    const error = new Error('Request failed with status code 400');
+    error.response = { status: 400, data: { error: { message: 'temperature is not supported for this model' } } };
+    throw error;
+  }, async () => {
+    const response = makeResponse();
+    await magicTailor({
+      body: {
+        jobDescription: 'A sufficiently long target job description',
+        resumeData: { summary: 'Original summary', experience: [], projects: [] }
+      }
+    }, response.res);
+    const { statusCode, payload } = response.read();
+    assert.equal(statusCode, 200);
+    assert.equal(payload.warnings.length, 1);
+    assert.match(payload.warnings[0], /Groq API returned HTTP 400: temperature is not supported/i);
+    assert.equal(calls, 1, 'non-retryable request errors must not waste backup-model quota');
+  });
+});
+
+
+test('prevents additions from being copied across unrelated employers or projects', async () => {
+  let systemPrompt = '';
+  await withAxiosMock(async (_url, body) => {
+    const prompt = body.messages[1].content;
+    if (prompt.includes('VERIFIED RESUME FACTS')) {
+      return { data: { choices: [{ message: { content: JSON.stringify({ options: ['Summary'] }) } }] } };
+    }
+    systemPrompt = body.messages[0].content;
+    return { data: { choices: [{ message: { content: validSectionResponse(prompt) } }] } };
+  }, async () => {
+    const response = makeResponse();
+    await magicTailor({
+      body: {
+        jobDescription: 'A sufficiently long target job description',
+        resumeData: {
+          summary: 'Engineer',
+          experience: [{ company: 'Acme', description: ['Built an internal tool'] }],
+          projects: [{ title: 'Personal project', description: ['Built a separate portfolio app'] }]
+        }
+      }
+    }, response.res);
+    assert.equal(response.read().statusCode, 200);
+  });
+  assert.match(systemPrompt, /must belong to THIS exact employer, project, or activity entry/i);
 });

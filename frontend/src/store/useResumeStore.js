@@ -536,7 +536,7 @@ export const useResumeStore = create((set, get) => ({
 
   applyTailoredBullet: (sectionKey, itemIndex, bulletIndex, expectedOriginal, replacement) => {
     const { activeResume, updateResumeData } = get();
-    if (!activeResume?.resumeData || !sectionKey || !Number.isInteger(itemIndex) || !Number.isInteger(bulletIndex)) return false;
+    if (!activeResume?.resumeData || !sectionKey || !Number.isInteger(itemIndex) || !Number.isInteger(bulletIndex) || !String(replacement || '').trim()) return false;
     const currentItems = activeResume.resumeData[sectionKey];
     const targetItem = Array.isArray(currentItems) ? currentItems[itemIndex] : null;
     if (!targetItem) return false;
@@ -544,12 +544,21 @@ export const useResumeStore = create((set, get) => ({
     const currentValue = targetItem[field];
     const isArray = Array.isArray(currentValue);
     const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\n');
+    const readText = (bullet) => typeof bullet === 'string' ? bullet.trim() : String(bullet?.text ?? bullet?.description ?? bullet?.content ?? bullet?.name ?? '').trim();
+    const expected = String(expectedOriginal || '').trim();
     let targetIndex = bulletIndex;
-    if (String(bulletList[targetIndex] || '').trim() !== String(expectedOriginal || '').trim()) {
-      targetIndex = bulletList.findIndex((bullet) => String(bullet || '').trim() === String(expectedOriginal || '').trim());
+    if (readText(bulletList[targetIndex]) !== expected) {
+      const matches = bulletList.map((bullet, index) => readText(bullet) === expected ? index : -1).filter((index) => index >= 0);
+      if (matches.length !== 1) return false;
+      targetIndex = matches[0];
     }
-    if (targetIndex < 0) return false;
-    bulletList[targetIndex] = replacement;
+    const currentBullet = bulletList[targetIndex];
+    if (currentBullet && typeof currentBullet === 'object' && !Array.isArray(currentBullet)) {
+      const textField = ['text', 'description', 'content', 'name'].find((key) => typeof currentBullet[key] === 'string') || 'text';
+      bulletList[targetIndex] = { ...currentBullet, [textField]: replacement.trim() };
+    } else {
+      bulletList[targetIndex] = replacement.trim();
+    }
     const updatedItems = [...currentItems];
     updatedItems[itemIndex] = { ...targetItem, [field]: isArray ? bulletList : bulletList.join('\n') };
     updateResumeData({ ...activeResume.resumeData, [sectionKey]: updatedItems });
@@ -579,11 +588,13 @@ export const useResumeStore = create((set, get) => ({
     const currentValue = targetItem[field];
     const isArray = Array.isArray(currentValue);
     const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\n');
+    const readText = (bullet) => typeof bullet === 'string' ? bullet.trim() : String(bullet?.text ?? bullet?.description ?? bullet?.content ?? bullet?.name ?? '').trim();
     let targetIndex = bulletIndex;
-    if (String(bulletList[targetIndex] || '').trim() !== String(expectedOriginal || '').trim()) {
-      targetIndex = bulletList.findIndex((bullet) => String(bullet || '').trim() === String(expectedOriginal || '').trim());
+    if (readText(bulletList[targetIndex]) !== String(expectedOriginal || '').trim()) {
+      const matches = bulletList.map((bullet, index) => readText(bullet) === String(expectedOriginal || '').trim() ? index : -1).filter((index) => index >= 0);
+      if (matches.length !== 1) return false;
+      targetIndex = matches[0];
     }
-    if (targetIndex < 0) return false;
     bulletList.splice(targetIndex, 1);
     const updatedItems = [...currentItems];
     updatedItems[itemIndex] = { ...targetItem, [field]: isArray ? bulletList : bulletList.join('\n') };

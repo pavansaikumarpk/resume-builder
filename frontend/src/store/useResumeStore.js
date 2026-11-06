@@ -390,9 +390,10 @@ export const useResumeStore = create((set, get) => ({
           itemTitle: entry.itemTitle || 'Resume entry',
           itemIndex: entry.itemIndex,
           bullets: Array.isArray(entry.bullets) ? entry.bullets.filter((bullet) => bullet.action !== 'keep') : [],
+          keptBullets: Array.isArray(entry.bullets) ? entry.bullets.filter((bullet) => bullet.action === 'keep') : [],
           additions: Array.isArray(entry.additions) ? entry.additions : []
         }))
-        .filter((entry) => entry.bullets.length || entry.additions.length);
+        .filter((entry) => entry.bullets.length || entry.additions.length || entry.keptBullets.length);
 
       const warnings = Array.isArray(data.warnings) ? data.warnings : [];
       const changedBulletCount = tailoredItems.reduce((total, item) =>

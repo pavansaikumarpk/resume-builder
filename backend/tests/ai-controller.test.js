@@ -91,7 +91,7 @@ test('isolates malformed model output to a section warning and leaves other sect
   let calls = 0;
   axios.post = async (_url, body) => {
     calls += 1;
-    if (body.messages[1].content.includes('"company":"Broken"')) {
+    if (body.messages[1].content.includes('"title":"Broken"')) {
       return { data: { choices: [{ message: { content: 'not json' } }] } };
     }
     const prompt = body.messages[1].content;

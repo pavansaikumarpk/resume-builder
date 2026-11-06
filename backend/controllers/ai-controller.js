@@ -272,7 +272,7 @@ const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) 
   try {
     return await optimizeArrayDataOnce(items, jd, sectionName, candidateContext);
   } catch (error) {
-    if (!/AI returned|AI omitted/.test(error.message || '')) throw error;
+    if (!/AI returned|AI omitted|Invalid JSON structure|Unexpected token|Expected property name|Empty payload/i.test(error.message || '')) throw error;
     return optimizeArrayDataOnce(items, jd, sectionName, candidateContext,
       `Your previous response failed validation: ${error.message}. Return every original bullet index exactly once, with no missing or duplicate decisions. Output valid JSON only.`);
   }

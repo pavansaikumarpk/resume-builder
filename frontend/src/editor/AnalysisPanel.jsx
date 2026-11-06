@@ -18,6 +18,7 @@
 //   const [jdText, setJdText] = useState('');
 //   const [selectedTone, setSelectedTone] = useState('impact');
 //   const [appliedItems, setAppliedItems] = useState(new Set());
+  const [editedSuggestions, setEditedSuggestions] = useState({});
 
 //   const handleGenerate = async () => {
 //     if (jdText.trim().length < 20) return alert("Paste a valid job description.");
@@ -181,6 +182,7 @@ export const AnalysisPanel = () => {
   const handleGenerate = async () => {
     if (jdText.trim().length < 20) return alert('Paste a valid job description.');
     setAppliedItems(new Set());
+    setEditedSuggestions({});
     await generateBulletOptions(jdText, 'impact');
   };
 
@@ -188,6 +190,7 @@ export const AnalysisPanel = () => {
     clearGeneratedBullets();
     setJdText('');
     setAppliedItems(new Set());
+    setEditedSuggestions({});
   };
 
   const markApplied = (id) => setAppliedItems((previous) => new Set(previous).add(id));
@@ -198,7 +201,7 @@ export const AnalysisPanel = () => {
   };
 
   const handleReplace = (group, bullet, id) => {
-    const ok = applyTailoredBullet(group.targetSectionKey, group.itemIndex, bullet.bulletIndex, bullet.original, bullet.text);
+    const ok = applyTailoredBullet(group.targetSectionKey, group.itemIndex, bullet.bulletIndex, bullet.original, editedSuggestions[id] ?? bullet.text);
     if (!ok) return alert('This bullet changed after analysis. Reset and run the Copilot again before applying this suggestion.');
     markApplied(id);
   };
@@ -210,7 +213,7 @@ export const AnalysisPanel = () => {
   };
 
   const handleAdd = (group, addition, id) => {
-    const ok = addTailoredBullet(group.targetSectionKey, group.itemIndex, addition.text);
+    const ok = addTailoredBullet(group.targetSectionKey, group.itemIndex, editedSuggestions[id] ?? addition.text);
     if (!ok) return alert('Could not add this suggestion. The resume entry may have changed.');
     markApplied(id);
   };
@@ -317,7 +320,13 @@ export const AnalysisPanel = () => {
                       {bullet.action === 'replace' && (
                         <div>
                           <p className="text-[10px] uppercase font-semibold text-cyan-700 mb-1">Improved for this JD</p>
-                          <p className="text-sm text-zinc-900 leading-relaxed">{bullet.text}</p>
+                          <textarea
+                            value={editedSuggestions[id] ?? bullet.text}
+                            onChange={(event) => setEditedSuggestions((previous) => ({ ...previous, [id]: event.target.value }))}
+                            rows={3}
+                            className="w-full rounded-lg border border-cyan-200 bg-white p-2 text-sm leading-relaxed text-zinc-900 focus:outline-none focus:ring-2 focus:ring-cyan-100"
+                            aria-label="Edit suggested replacement"
+                          />
                         </div>
                       )}
                       {bullet.reason && <p className="text-[11px] text-zinc-500 leading-relaxed">{bullet.reason}</p>}
@@ -341,7 +350,13 @@ export const AnalysisPanel = () => {
                   return (
                     <div key={id} className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50/40 p-3 space-y-3">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Suggested new point</span>
-                      <p className="text-sm leading-relaxed text-zinc-900">{addition.text}</p>
+                      <textarea
+                        value={editedSuggestions[id] ?? addition.text}
+                        onChange={(event) => setEditedSuggestions((previous) => ({ ...previous, [id]: event.target.value }))}
+                        rows={3}
+                        className="w-full rounded-lg border border-emerald-200 bg-white p-2 text-sm leading-relaxed text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                        aria-label="Edit suggested new point"
+                      />
                       {addition.reason && <p className="text-[11px] text-zinc-500">{addition.reason}</p>}
                       <div className="flex justify-end">
                         <button disabled={applied} onClick={() => handleAdd(group, addition, id)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 text-xs font-semibold disabled:opacity-50">

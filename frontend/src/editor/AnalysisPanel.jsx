@@ -196,6 +196,12 @@ export const AnalysisPanel = () => {
   const markApplied = (id) => setAppliedItems((previous) => new Set(previous).add(id));
 
   const handleApplySummary = (newSummary, idx) => {
+    const currentSummary = activeResume?.resumeData?.summary || '';
+    const analyzedSummary = generatedBullets?.sourceSummary || '';
+    if (currentSummary !== analyzedSummary) {
+      return alert('Your summary changed after this analysis. Run the Copilot again before applying this suggestion.');
+    }
+    if (!activeResume?.resumeData) return alert('Load a resume before applying this summary.');
     updateResumeData({ ...activeResume.resumeData, summary: newSummary });
     markApplied('summary-' + idx);
   };

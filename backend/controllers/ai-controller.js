@@ -1,23 +1,23 @@
-// const axios = require('axios');
-// 
-// // ============================================================================
-// // UTILITY: JSON SANITIZATION & NETWORK
-// // ============================================================================
+const axios = require('axios');
 
-// const extractCleanJSON = (rawText) => {
-//   if (!rawText || typeof rawText !== 'string') throw new Error("Empty payload received.");
-//   let cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-//   const firstBrace = cleanText.indexOf('{');
-//   const lastBrace = cleanText.lastIndexOf('}');
-//   if (firstBrace === -1 || lastBrace === -1) throw new Error("Invalid JSON structure.");
-//   return JSON.parse(cleanText.substring(firstBrace, lastBrace + 1));
-// };
+// ============================================================================
+// GROQ-ONLY MODEL CONFIGURATION
+// ============================================================================
 
-// const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODELS = [
-  "openai/gpt-oss-120b", // Primary: stronger reasoning and resume analysis.
-  "openai/gpt-oss-20b"   // Backup: faster, smaller fallback on the same Groq account.
+  "openai/gpt-oss-120b", // Primary model.
+  "openai/gpt-oss-20b"   // Backup model on the same Groq provider.
 ];
+
+const extractCleanJSON = (rawText) => {
+  if (!rawText || typeof rawText !== 'string') throw new Error("Empty payload received.");
+  const cleanText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const firstBrace = cleanText.indexOf('{');
+  const lastBrace = cleanText.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace === -1) throw new Error("Invalid JSON structure.");
+  return JSON.parse(cleanText.substring(firstBrace, lastBrace + 1));
+};
 
 const getAIConfig = () => {
   const apiKey = process.env.GROQ_API_KEY;
@@ -25,9 +25,6 @@ const getAIConfig = () => {
   return { apiKey, baseUrl: GROQ_API_URL, models: GROQ_MODELS };
 };
 
-// Retry transient failures on the primary model, then switch to the backup
-// model. Authentication and malformed-request errors are not retried because
-// they will not be fixed by changing models.
 const isRetryableGroqError = (error) => {
   const status = error.response?.status;
   return !status || status === 404 || status === 429 || status >= 500;
@@ -48,7 +45,7 @@ const callAIEngineWithRetry = async (prompt, systemInstruction, options = {}, re
           ],
           temperature: options.temperature ?? 0.4,
           response_format: options.jsonMode !== false ? { type: "json_object" } : undefined,
-          max_tokens: options.maxTokens || 4096,
+          max_tokens: options.maxTokens || 4096
         }, {
           headers: {
             Authorization: `Bearer ${apiKey}`,
@@ -57,34 +54,31 @@ const callAIEngineWithRetry = async (prompt, systemInstruction, options = {}, re
           timeout: 25000
         });
 
-        const content = response?.data?.choices?.[0]?.message?.content;
-        if (typeof content !== "string" || !content.trim()) {
+        const responseContent = response?.data?.choices?.[0]?.message?.content;
+        if (typeof responseContent !== 'string' || !responseContent.trim()) {
           throw new Error("Groq returned an empty AI response.");
         }
-        return content;
+        return responseContent;
       } catch (error) {
         lastError = error;
         if (!isRetryableGroqError(error)) throw error;
 
-        // A missing model or exhausted model quota will not recover by
-        // retrying the same model; switch straight to the backup instead.
         const status = error.response?.status;
+        // A retired model or exhausted per-model quota should immediately
+        // fall through to the backup rather than retrying the same model.
         if (status === 404 || status === 429) {
           console.warn(`Groq model ${modelName} returned HTTP ${status}; switching to backup if available.`);
           break;
         }
 
-        const isLastAttempt = attempt === retries;
-        if (isLastAttempt) {
-          console.warn(`Groq model ${modelName} failed; ${modelName === models[0] ? "trying backup model" : "no backup model remains"}.`, {
-            status: error.response?.status,
+        if (attempt === retries) {
+          console.warn(`Groq model ${modelName} failed; moving to the next configured model.`, {
+            status,
             message: error.message
           });
           break;
         }
-
-        const delayMs = 1000 * Math.pow(2, attempt);
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
       }
     }
   }

@@ -66,6 +66,14 @@ const callAIEngineWithRetry = async (prompt, systemInstruction, options = {}, re
         lastError = error;
         if (!isRetryableGroqError(error)) throw error;
 
+        // A missing model or exhausted model quota will not recover by
+        // retrying the same model; switch straight to the backup instead.
+        const status = error.response?.status;
+        if (status === 404 || status === 429) {
+          console.warn(`Groq model ${modelName} returned HTTP ${status}; switching to backup if available.`);
+          break;
+        }
+
         const isLastAttempt = attempt === retries;
         if (isLastAttempt) {
           console.warn(`Groq model ${modelName} failed; ${modelName === models[0] ? "trying backup model" : "no backup model remains"}.`, {

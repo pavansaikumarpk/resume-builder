@@ -252,23 +252,37 @@ const callAIEngineWithRetry = async (prompt, systemInstruction, options = {}, re
 // CORE AI PROCESSORS (DECENTRALIZED ARCHITECTURE)
 // ============================================================================
 
-const optimizeSummary = async (summary, jd) => {
-  if (!summary) return [];
+const optimizeSummary = async (summary, jd, candidateContext = {}) => {
+  const existingSummary = typeof summary === 'string' ? summary.trim() : '';
+  const verifiedFacts = {
+    experience: candidateContext.experience || [],
+    projects: candidateContext.projects || [],
+    skills: candidateContext.skills || [],
+    education: candidateContext.education || [],
+    certifications: candidateContext.certifications || []
+  };
+  const hasVerifiedFacts = Object.values(verifiedFacts).some((value) =>
+    Array.isArray(value) ? value.length > 0 : Boolean(value)
+  );
+  if (!existingSummary && !hasVerifiedFacts) return [];
+
   const systemInstruction = `You are an evidence-grounded resume summary editor.
-Create up to three concise alternatives tailored to the target job description.
-Use only facts, skills, tools, responsibilities, and outcomes explicitly supported by the original resume.
-Never invent metrics, years of experience, certifications, technologies, seniority, leadership, or achievements.
-Use relevant language from the job description only when the resume provides evidence for it.
-Do not keyword-stuff or claim qualifications the candidate does not have.
-If tailoring cannot make the summary genuinely better without adding unsupported claims, return the original summary as the only option.
+Create up to three concise professional-summary alternatives tailored to the target job description.
+Use only facts explicitly supported by the supplied resume summary and verified resume sections.
+When the original summary is empty, build a draft only from verified experience, project, skill, education, and certification facts.
+Never invent metrics, years of experience, certifications, technologies, seniority, leadership, employers, or achievements.
+Do not infer proficiency from a skill merely being listed. Do not claim a qualification just because it appears in the job description.
+If there is insufficient evidence to write a meaningful summary, return an empty options array.
+If an existing summary cannot be improved truthfully, return it unchanged as the only option.
 Return only JSON: { "options": ["summary option 1", "summary option 2"] }`;
-  const prompt = `TARGET JOB DESCRIPTION:\n${jd}\n\nORIGINAL RESUME SUMMARY (source of truth):\n${summary}`;
+  const prompt = `TARGET JOB DESCRIPTION:\n${jd}\n\nEXISTING SUMMARY (may be empty):\n${existingSummary}\n\nVERIFIED RESUME FACTS (only source of truth):\n${JSON.stringify(verifiedFacts)}`;
   const out = await callAIEngineWithRetry(prompt, systemInstruction, { maxTokens: 900, temperature: 0.2 });
   const parsed = extractCleanJSON(out);
-  if (!Array.isArray(parsed.options) || !parsed.options.some((option) => typeof option === 'string' && option.trim())) {
-    throw new Error('AI returned no valid summary options.');
-  }
-  return parsed.options.filter((option) => typeof option === 'string' && option.trim()).slice(0, 3);
+  if (!Array.isArray(parsed.options)) throw new Error('AI returned an invalid summary options list.');
+  return parsed.options
+    .filter((option) => typeof option === 'string' && option.trim())
+    .map((option) => option.trim())
+    .slice(0, 3);
 };
 
 const organizeSkillsEngine = async (skillsArray, jd) => {
@@ -416,12 +430,14 @@ const magicTailor = async (req, res) => {
     });
     const candidateContext = {
       summary: resumeData.summary || '',
+      experience: resumeData.experience || [],
+      projects: resumeData.projects || [],
       skills: resumeData.skills || [],
       education: resumeData.education || [],
       certifications: resumeData.certifications || []
     };
     const [summaryResult, ...sectionResults] = await Promise.allSettled([
-      optimizeSummary(resumeData.summary, jobDescription),
+      optimizeSummary(resumeData.summary, jobDescription, candidateContext),
       ...sectionTasks.map((section) => optimizeArrayData(section.items, jobDescription, section.title, candidateContext))
     ]);
     const warnings = [];

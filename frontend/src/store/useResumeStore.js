@@ -557,10 +557,23 @@ export const useResumeStore = create((set, get) => ({
 
   removeTailoredBullet: (sectionKey, itemIndex, bulletIndex, expectedOriginal) => {
     const { activeResume, updateResumeData } = get();
-    if (!activeResume?.resumeData || !sectionKey || !Number.isInteger(itemIndex) || !Number.isInteger(bulletIndex)) return false;
+    if (!activeResume?.resumeData || !sectionKey || !Number.isInteger(itemIndex)) return false;
     const currentItems = activeResume.resumeData[sectionKey];
-    const targetItem = Array.isArray(currentItems) ? currentItems[itemIndex] : null;
-    if (!targetItem) return false;
+    if (!Array.isArray(currentItems) || !currentItems[itemIndex]) return false;
+
+    const section = (activeResume.resumeData.sections || []).find((entry) => entry.key === sectionKey);
+    if (section?.type === 'bullets') {
+      const point = currentItems[itemIndex];
+      const currentText = typeof point === 'string' ? point : String(point?.text || '');
+      if (currentText.trim() !== String(expectedOriginal || '').trim()) return false;
+      const updatedItems = [...currentItems];
+      updatedItems.splice(itemIndex, 1);
+      updateResumeData({ ...activeResume.resumeData, [sectionKey]: updatedItems });
+      return true;
+    }
+
+    if (!Number.isInteger(bulletIndex)) return false;
+    const targetItem = currentItems[itemIndex];
     const field = targetItem.description !== undefined ? 'description' : (targetItem.bulletPoints !== undefined ? 'bulletPoints' : 'text');
     const currentValue = targetItem[field];
     const isArray = Array.isArray(currentValue);
@@ -581,7 +594,19 @@ export const useResumeStore = create((set, get) => ({
     const { activeResume, updateResumeData } = get();
     if (!activeResume?.resumeData || !sectionKey || !text?.trim()) return false;
     const currentItems = activeResume.resumeData[sectionKey];
-    const targetItem = Array.isArray(currentItems) ? currentItems[itemIndex] : null;
+    if (!Array.isArray(currentItems)) return false;
+    const section = (activeResume.resumeData.sections || []).find((entry) => entry.key === sectionKey);
+
+    if (section?.type === 'bullets') {
+      const updatedItems = [...currentItems];
+      const referencePoint = Number.isInteger(itemIndex) ? currentItems[itemIndex] : null;
+      const date = referencePoint && typeof referencePoint === 'object' ? (referencePoint.date || '') : '';
+      updatedItems.splice(Number.isInteger(itemIndex) ? itemIndex + 1 : updatedItems.length, 0, { date, text: text.trim() });
+      updateResumeData({ ...activeResume.resumeData, [sectionKey]: updatedItems });
+      return true;
+    }
+
+    const targetItem = currentItems[itemIndex];
     if (!targetItem) return false;
     const field = targetItem.description !== undefined ? 'description' : (targetItem.bulletPoints !== undefined ? 'bulletPoints' : 'text');
     const currentValue = targetItem[field];

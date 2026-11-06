@@ -370,7 +370,6 @@ export const useResumeStore = create((set, get) => ({
     const { activeResume } = get();
     if (!activeResume?.resumeData) throw new Error('Load a resume before tailoring it.');
     set({ isTailoring: true, generatedBullets: null });
-
     try {
       const response = await api.post('/ai/tailor-resume', {
         resumeData: activeResume.resumeData,
@@ -382,67 +381,34 @@ export const useResumeStore = create((set, get) => ({
         throw new Error(data?.error || 'The AI returned an invalid tailoring response.');
       }
 
-      const original = activeResume.resumeData;
-      const tailored = data.tailoredData;
-      const tailoredItems = [];
-      const sections = (original.sections || []).filter((section) =>
-        section.key === 'experience' || section.key === 'projects' ||
-        (section.isCustom && (section.type === 'list' || section.type === 'bullets'))
-      );
-      const normalize = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-      const toBulletEntries = (value) => {
-        const entries = Array.isArray(value) ? value : String(value || '').split('\n');
-        return entries
-          .map((bullet, index) => ({ index, text: String(bullet || '').trim() }))
-          .filter((entry) => entry.text);
-      };
-
-      sections.forEach((section) => {
-        const sourceItems = Array.isArray(original[section.key]) ? original[section.key] : [];
-        const proposedItems = Array.isArray(tailored[section.key]) ? tailored[section.key] : [];
-        sourceItems.forEach((sourceItem, itemIndex) => {
-          const proposedItem = proposedItems[itemIndex];
-          if (!proposedItem) return;
-          const field = sourceItem.description !== undefined
-            ? 'description'
-            : (sourceItem.bulletPoints !== undefined ? 'bulletPoints' : 'text');
-          const sourceBullets = toBulletEntries(sourceItem[field]);
-          const proposedBullets = toBulletEntries(proposedItem[field]);
-          const suggestions = sourceBullets.reduce((result, sourceBullet, position) => {
-            const proposedBullet = proposedBullets[position];
-            if (!proposedBullet || normalize(proposedBullet.text) === normalize(sourceBullet.text)) return result;
-            result.push({
-              bulletIndex: sourceBullet.index,
-              original: sourceBullet.text,
-              proposed: proposedBullet.text
-            });
-            return result;
-          }, []);
-
-          if (suggestions.length) {
-            tailoredItems.push({
-              sectionKey: section.title || section.key,
-              targetSectionKey: section.key,
-              itemTitle: sourceItem.company || sourceItem.name || sourceItem.title || sourceItem.position || 'Resume entry',
-              itemIndex,
-              suggestions
-            });
-          }
-        });
-      });
-
       const summaryOptions = (Array.isArray(data.summaryOptions) ? data.summaryOptions : [])
-        .filter((option) => typeof option === 'string' && option.trim() && option.trim() !== (original.summary || '').trim());
-      const warnings = Array.isArray(data.warnings) ? [...data.warnings] : [];
+        .filter((option) => typeof option === 'string' && option.trim() && option.trim() !== (activeResume.resumeData.summary || '').trim());
+      const tailoredItems = (Array.isArray(data.bulletActions) ? data.bulletActions : [])
+        .map((entry) => ({
+          sectionKey: entry.sectionTitle || entry.sectionKey,
+          targetSectionKey: entry.sectionKey,
+          itemTitle: entry.itemTitle || 'Resume entry',
+          itemIndex: entry.itemIndex,
+          bullets: Array.isArray(entry.bullets) ? entry.bullets.filter((bullet) => bullet.action !== 'keep') : [],
+          keptBullets: Array.isArray(entry.bullets) ? entry.bullets.filter((bullet) => bullet.action === 'keep') : [],
+          additions: Array.isArray(entry.additions) ? entry.additions : []
+        }))
+        .filter((entry) => entry.bullets.length || entry.additions.length || entry.keptBullets.length);
+
+      const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+      const changedBulletCount = tailoredItems.reduce((total, item) =>
+        total + item.bullets.length + item.additions.length, 0);
 
       set({
         generatedBullets: {
           success: true,
           summaryOptions,
+          sourceSummary: activeResume.resumeData.summary || '',
           tailoredItems,
           warnings,
-          changedBulletCount: data.changedBulletCount || 0,
-          reviewedBulletCount: data.reviewedBulletCount || 0
+          changedBulletCount,
+          reviewedBulletCount: data.reviewedBulletCount || 0,
+          atsScore: null
         }
       });
       return true;
@@ -571,33 +537,101 @@ export const useResumeStore = create((set, get) => ({
 
   applyTailoredBullet: (sectionKey, itemIndex, bulletIndex, expectedOriginal, replacement) => {
     const { activeResume, updateResumeData } = get();
-    if (!activeResume?.resumeData || !sectionKey || !Number.isInteger(itemIndex) || !Number.isInteger(bulletIndex)) return false;
-
+    if (!activeResume?.resumeData || !sectionKey || !Number.isInteger(itemIndex) || !Number.isInteger(bulletIndex) || !String(replacement || '').trim()) return false;
     const currentItems = activeResume.resumeData[sectionKey];
     const targetItem = Array.isArray(currentItems) ? currentItems[itemIndex] : null;
     if (!targetItem) return false;
-
-    const field = targetItem.description !== undefined
-      ? 'description'
-      : (targetItem.bulletPoints !== undefined ? 'bulletPoints' : 'text');
+    const field = targetItem.description !== undefined ? 'description' : (targetItem.bulletPoints !== undefined ? 'bulletPoints' : 'text');
     const currentValue = targetItem[field];
     const isArray = Array.isArray(currentValue);
     const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\n');
-    const currentBullet = String(bulletList[bulletIndex] || '').trim();
-
-    // Refuse to overwrite if the user edited the source bullet after suggestions were generated.
-    if (currentBullet !== String(expectedOriginal || '').trim()) return false;
-
-    bulletList[bulletIndex] = replacement;
+    const readText = (bullet) => typeof bullet === 'string' ? bullet.trim() : String(bullet?.text ?? bullet?.description ?? bullet?.content ?? bullet?.name ?? '').trim();
+    const expected = String(expectedOriginal || '').trim();
+    let targetIndex = bulletIndex;
+    if (readText(bulletList[targetIndex]) !== expected) {
+      const matches = bulletList.map((bullet, index) => readText(bullet) === expected ? index : -1).filter((index) => index >= 0);
+      if (matches.length !== 1) return false;
+      targetIndex = matches[0];
+    }
+    const currentBullet = bulletList[targetIndex];
+    if (currentBullet && typeof currentBullet === 'object' && !Array.isArray(currentBullet)) {
+      const textField = ['text', 'description', 'content', 'name'].find((key) => typeof currentBullet[key] === 'string') || 'text';
+      bulletList[targetIndex] = { ...currentBullet, [textField]: replacement.trim() };
+    } else {
+      bulletList[targetIndex] = replacement.trim();
+    }
     const updatedItems = [...currentItems];
-    updatedItems[itemIndex] = {
-      ...targetItem,
-      [field]: isArray ? bulletList : bulletList.join('\\n')
-    };
-    updateResumeData({
-      ...activeResume.resumeData,
-      [sectionKey]: updatedItems
-    });
+    updatedItems[itemIndex] = { ...targetItem, [field]: isArray ? bulletList : bulletList.join('\n') };
+    updateResumeData({ ...activeResume.resumeData, [sectionKey]: updatedItems });
+    return true;
+  },
+
+  removeTailoredBullet: (sectionKey, itemIndex, bulletIndex, expectedOriginal) => {
+    const { activeResume, updateResumeData } = get();
+    if (!activeResume?.resumeData || !sectionKey || !Number.isInteger(itemIndex)) return false;
+    const currentItems = activeResume.resumeData[sectionKey];
+    if (!Array.isArray(currentItems) || !currentItems[itemIndex]) return false;
+
+    const section = (activeResume.resumeData.sections || []).find((entry) => entry.key === sectionKey);
+    if (section?.type === 'bullets') {
+      const point = currentItems[itemIndex];
+      const currentText = typeof point === 'string' ? point : String(point?.text || '');
+      if (currentText.trim() !== String(expectedOriginal || '').trim()) return false;
+      const updatedItems = [...currentItems];
+      updatedItems.splice(itemIndex, 1);
+      updateResumeData({ ...activeResume.resumeData, [sectionKey]: updatedItems });
+      return true;
+    }
+
+    if (!Number.isInteger(bulletIndex)) return false;
+    const targetItem = currentItems[itemIndex];
+    const field = targetItem.description !== undefined ? 'description' : (targetItem.bulletPoints !== undefined ? 'bulletPoints' : 'text');
+    const currentValue = targetItem[field];
+    const isArray = Array.isArray(currentValue);
+    const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\n');
+    const readText = (bullet) => typeof bullet === 'string' ? bullet.trim() : String(bullet?.text ?? bullet?.description ?? bullet?.content ?? bullet?.name ?? '').trim();
+    let targetIndex = bulletIndex;
+    if (readText(bulletList[targetIndex]) !== String(expectedOriginal || '').trim()) {
+      const matches = bulletList.map((bullet, index) => readText(bullet) === String(expectedOriginal || '').trim() ? index : -1).filter((index) => index >= 0);
+      if (matches.length !== 1) return false;
+      targetIndex = matches[0];
+    }
+    bulletList.splice(targetIndex, 1);
+    const updatedItems = [...currentItems];
+    updatedItems[itemIndex] = { ...targetItem, [field]: isArray ? bulletList : bulletList.join('\n') };
+    updateResumeData({ ...activeResume.resumeData, [sectionKey]: updatedItems });
+    return true;
+  },
+
+  addTailoredBullet: (sectionKey, itemIndex, text) => {
+    const { activeResume, updateResumeData } = get();
+    if (!activeResume?.resumeData || !sectionKey || !text?.trim()) return false;
+    const currentItems = activeResume.resumeData[sectionKey];
+    if (!Array.isArray(currentItems)) return false;
+    const section = (activeResume.resumeData.sections || []).find((entry) => entry.key === sectionKey);
+
+    if (section?.type === 'bullets') {
+      const exists = currentItems.some((point) => {
+        const value = typeof point === 'string' ? point : point?.text;
+        return String(value || '').trim().toLowerCase() === text.trim().toLowerCase();
+      });
+      if (exists) return false;
+      const updatedItems = [...currentItems, { date: '', text: text.trim() }];
+      updateResumeData({ ...activeResume.resumeData, [sectionKey]: updatedItems });
+      return true;
+    }
+
+    const targetItem = currentItems[itemIndex];
+    if (!targetItem) return false;
+    const field = targetItem.description !== undefined ? 'description' : (targetItem.bulletPoints !== undefined ? 'bulletPoints' : 'text');
+    const currentValue = targetItem[field];
+    const isArray = Array.isArray(currentValue);
+    const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\n').filter(Boolean);
+    if (bulletList.some((bullet) => String(bullet || '').trim().toLowerCase() === text.trim().toLowerCase())) return false;
+    bulletList.push(text.trim());
+    const updatedItems = [...currentItems];
+    updatedItems[itemIndex] = { ...targetItem, [field]: isArray ? bulletList : bulletList.join('\n') };
+    updateResumeData({ ...activeResume.resumeData, [sectionKey]: updatedItems });
     return true;
   },
 

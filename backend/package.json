@@ -6,12 +6,13 @@
   "scripts": {
     "dev": "nodemon --exec babel-node server.js",
     "build": "babel . --out-dir dist --copy-files --ignore node_modules,.git",
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js"
   },
   "author": "",
   "license": "ISC",
   "engines": {
-    "node": "18.x"
+    "node": "20.x"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1050.0",

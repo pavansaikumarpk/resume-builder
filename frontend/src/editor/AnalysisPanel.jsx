@@ -19,6 +19,7 @@
 //   const [selectedTone, setSelectedTone] = useState('impact');
 //   const [appliedItems, setAppliedItems] = useState(new Set());
   const [editedSuggestions, setEditedSuggestions] = useState({});
+  const [editedSuggestions, setEditedSuggestions] = useState({});
 
 //   const handleGenerate = async () => {
 //     if (jdText.trim().length < 20) return alert("Paste a valid job description.");

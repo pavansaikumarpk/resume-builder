@@ -543,8 +543,12 @@ export const useResumeStore = create((set, get) => ({
     const currentValue = targetItem[field];
     const isArray = Array.isArray(currentValue);
     const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\n');
-    if (String(bulletList[bulletIndex] || '').trim() !== String(expectedOriginal || '').trim()) return false;
-    bulletList[bulletIndex] = replacement;
+    let targetIndex = bulletIndex;
+    if (String(bulletList[targetIndex] || '').trim() !== String(expectedOriginal || '').trim()) {
+      targetIndex = bulletList.findIndex((bullet) => String(bullet || '').trim() === String(expectedOriginal || '').trim());
+    }
+    if (targetIndex < 0) return false;
+    bulletList[targetIndex] = replacement;
     const updatedItems = [...currentItems];
     updatedItems[itemIndex] = { ...targetItem, [field]: isArray ? bulletList : bulletList.join('\n') };
     updateResumeData({ ...activeResume.resumeData, [sectionKey]: updatedItems });
@@ -561,8 +565,12 @@ export const useResumeStore = create((set, get) => ({
     const currentValue = targetItem[field];
     const isArray = Array.isArray(currentValue);
     const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\n');
-    if (String(bulletList[bulletIndex] || '').trim() !== String(expectedOriginal || '').trim()) return false;
-    bulletList.splice(bulletIndex, 1);
+    let targetIndex = bulletIndex;
+    if (String(bulletList[targetIndex] || '').trim() !== String(expectedOriginal || '').trim()) {
+      targetIndex = bulletList.findIndex((bullet) => String(bullet || '').trim() === String(expectedOriginal || '').trim());
+    }
+    if (targetIndex < 0) return false;
+    bulletList.splice(targetIndex, 1);
     const updatedItems = [...currentItems];
     updatedItems[itemIndex] = { ...targetItem, [field]: isArray ? bulletList : bulletList.join('\n') };
     updateResumeData({ ...activeResume.resumeData, [sectionKey]: updatedItems });

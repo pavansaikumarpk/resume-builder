@@ -160,7 +160,7 @@
 
 import React, { useState } from 'react';
 import { useResumeStore } from '../store/useResumeStore';
-import { Sparkles, Loader2, Plus, RotateCcw, Check, Trash2, X } from 'lucide-react';
+import { Sparkles, Loader2, Plus, RotateCcw, Check, Trash2 } from 'lucide-react';
 
 export const AnalysisPanel = () => {
   const {

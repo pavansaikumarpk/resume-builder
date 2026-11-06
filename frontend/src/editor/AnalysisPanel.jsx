@@ -160,16 +160,27 @@
 
 import React, { useState } from 'react';
 import { useResumeStore } from '../store/useResumeStore';
-import { Sparkles, Loader2, Plus, RotateCcw, Check } from 'lucide-react';
+import { Sparkles, Loader2, Plus, RotateCcw, Check, Trash2, X } from 'lucide-react';
 
 export const AnalysisPanel = () => {
-  const { generateBulletOptions, isTailoring, generatedBullets, applyTailoredBullet, updateResumeData, activeResume, clearGeneratedBullets } = useResumeStore();
+  const {
+    generateBulletOptions,
+    isTailoring,
+    generatedBullets,
+    applyTailoredBullet,
+    removeTailoredBullet,
+    addTailoredBullet,
+    updateResumeData,
+    activeResume,
+    clearGeneratedBullets
+  } = useResumeStore();
+
   const [jdText, setJdText] = useState('');
   const [appliedItems, setAppliedItems] = useState(new Set());
 
   const handleGenerate = async () => {
-    if (jdText.trim().length < 20) return alert("Paste a valid job description.");
-    // Tone fixed to 'impact' for this request flow
+    if (jdText.trim().length < 20) return alert('Paste a valid job description.');
+    setAppliedItems(new Set());
     await generateBulletOptions(jdText, 'impact');
   };
 
@@ -179,156 +190,175 @@ export const AnalysisPanel = () => {
     setAppliedItems(new Set());
   };
 
+  const markApplied = (id) => setAppliedItems((previous) => new Set(previous).add(id));
+
   const handleApplySummary = (newSummary, idx) => {
     updateResumeData({ ...activeResume.resumeData, summary: newSummary });
-    setAppliedItems(prev => new Set(prev).add(`summary-${idx}`));
+    markApplied('summary-' + idx);
   };
 
-  const handleApplyBullet = (itemGroup, suggestion, uniqueId) => {
-    const applied = applyTailoredBullet(
-      itemGroup.targetSectionKey,
-      itemGroup.itemIndex,
-      suggestion.bulletIndex,
-      suggestion.original,
-      suggestion.proposed
-    );
-    if (!applied) {
-      alert('This original bullet has changed since the suggestions were generated. Reset and run the Copilot again to avoid overwriting your latest edit.');
-      return;
-    }
-    setAppliedItems(prev => new Set(prev).add(uniqueId));
+  const handleReplace = (group, bullet, id) => {
+    const ok = applyTailoredBullet(group.targetSectionKey, group.itemIndex, bullet.bulletIndex, bullet.original, bullet.text);
+    if (!ok) return alert('This bullet changed after analysis. Reset and run the Copilot again before applying this suggestion.');
+    markApplied(id);
   };
 
-  const hasGranularData = generatedBullets?.tailoredItems && generatedBullets.tailoredItems.length > 0;
+  const handleRemove = (group, bullet, id) => {
+    const ok = removeTailoredBullet(group.targetSectionKey, group.itemIndex, bullet.bulletIndex, bullet.original);
+    if (!ok) return alert('This bullet changed after analysis. Reset and run the Copilot again before removing it.');
+    markApplied(id);
+  };
+
+  const handleAdd = (group, addition, id) => {
+    const ok = addTailoredBullet(group.targetSectionKey, group.itemIndex, addition.text);
+    if (!ok) return alert('Could not add this suggestion. The resume entry may have changed.');
+    markApplied(id);
+  };
+
+  const recommendations = generatedBullets?.tailoredItems || [];
+  const hasChanges = recommendations.length > 0 || (generatedBullets?.summaryOptions || []).length > 0;
 
   return (
     <div className="h-full flex flex-col bg-[#fbfdff] font-sans">
-      
-      <div className="px-5 py-4 bg-white border-b border-zinc-100 flex justify-between items-center sticky top-0 z-10 shadow-inner relative">
+      <div className="px-5 py-4 bg-white border-b border-zinc-100 flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-2">
-            <Sparkles className="text-zinc-900" size={18} />
-            <h2 className="text-sm font-semibold text-zinc-900 tracking-tight">AI Copilot</h2>
+          <Sparkles className="text-zinc-900" size={18} />
+          <h2 className="text-sm font-semibold text-zinc-900 tracking-tight">AI Copilot</h2>
         </div>
         {generatedBullets && (
-             <button onClick={handleReset} className="text-xs font-medium text-zinc-500 hover:text-zinc-900 flex items-center gap-1.5 transition-colors bg-[#fbfdff] border border-zinc-100 px-3 py-1.5 rounded-lg">
-                 <RotateCcw size={14}/> Reset
-             </button>
+          <button onClick={handleReset} className="text-xs font-medium text-zinc-500 hover:text-zinc-900 flex items-center gap-1.5 bg-white border border-zinc-200 px-3 py-1.5 rounded-lg">
+            <RotateCcw size={14} /> New JD
+          </button>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-8 pb-20 relative z-0">
-        
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6 pb-20">
         {!generatedBullets && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-                <div className="space-y-2 relative">
-                    <label className="text-xs font-semibold text-zinc-800 ml-1">Target Job Description</label>
-                    <textarea 
-                        value={jdText}
-                        onChange={(e) => setJdText(e.target.value)}
-                        className="w-full h-48 p-4 bg-white border border-zinc-200 rounded-xl outline-none focus:border-cyan-300 transition-all resize-none text-sm shadow-inner placeholder:text-zinc-400 text-zinc-900"
-                        placeholder="Paste the job requirements here..."
-                    />
-                </div>
-                
-                <button 
-                    onClick={handleGenerate} 
-                    disabled={isTailoring}
-                    className="w-full bg-[#06b6d4] hover:bg-cyan-600 text-white text-sm font-bold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 disabled:opacity-50"
-                >
-                    {isTailoring ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
-                    {isTailoring ? 'Analyzing Resume...' : 'Generate Options'}
-                </button>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-zinc-800">Target Job Description</label>
+              <textarea
+                value={jdText}
+                onChange={(event) => setJdText(event.target.value)}
+                className="w-full h-56 p-4 bg-white border border-zinc-200 rounded-xl outline-none focus:border-cyan-400 resize-y text-sm shadow-sm placeholder:text-zinc-400 text-zinc-900"
+                placeholder="Paste any job description here. The Copilot will compare it with every resume bullet..."
+              />
             </div>
+            <button
+              onClick={handleGenerate}
+              disabled={isTailoring}
+              className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold py-3.5 rounded-xl shadow-sm transition-all flex justify-center items-center gap-2 disabled:opacity-50"
+            >
+              {isTailoring ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+              {isTailoring ? 'Reviewing every resume point...' : 'Analyze and improve resume'}
+            </button>
+            <p className="text-[11px] text-zinc-500 leading-relaxed">
+              The AI will recommend keeping, replacing, removing, or adding points. Nothing changes until you choose an action. No ATS score is fabricated.
+            </p>
+          </div>
         )}
 
         {generatedBullets && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative z-0">
-            
+          <div className="space-y-6">
             <div className="bg-white border border-zinc-200 rounded-xl p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-zinc-900">JD-tailored suggestions</p>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Reviewed {generatedBullets.reviewedBulletCount || 0} bullets. Showing only the {generatedBullets.changedBulletCount || 0} that could be materially improved for this job.
-                  </p>
-                  <p className="text-xs text-zinc-500 mt-1">Nothing is changed in your resume until you apply a suggestion.</p>
-                </div>
-                <span className="text-xs font-semibold text-cyan-700 bg-cyan-50 px-2.5 py-1.5 rounded-lg">{generatedBullets.changedBulletCount || 0} to improve</span>
-              </div>
+              <p className="text-sm font-semibold text-zinc-900">Resume improvement plan</p>
+              <p className="text-xs text-zinc-500 mt-1">
+                Reviewed {generatedBullets.reviewedBulletCount || 0} existing points. {generatedBullets.changedBulletCount || 0} suggested actions are available.
+              </p>
+              <p className="text-[11px] text-zinc-500 mt-2">No automatic edits. No estimated ATS score. You control every change.</p>
             </div>
+
             {generatedBullets.warnings?.map((warning, index) => (
-              <div key={index} role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">{warning}</div>
+              <div key={index} role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                {warning}
+              </div>
             ))}
 
-            {/* SUMMARY OPTIONS */}
-            {generatedBullets.summaryOptions && generatedBullets.summaryOptions.length > 0 && (
-                <div className="space-y-3 relative z-0">
-                    <h3 className="text-xs font-semibold text-zinc-800 flex items-center gap-2 uppercase tracking-wider pl-1">
-                        Professional Summary
-                    </h3>
-                    <div className="space-y-3">
-                        {generatedBullets.summaryOptions.map((opt, idx) => {
-                            const isApplied = appliedItems.has(`summary-${idx}`);
-                            return (
-                                <div key={idx} className="p-4 bg-white border border-zinc-200 rounded-xl shadow-sm hover:border-cyan-200 transition-all group relative pr-14 relative z-0">
-                                    <p className="text-sm text-zinc-700 leading-relaxed">{opt}</p>
-                                    <button 
-                                        onClick={() => handleApplySummary(opt, idx)}
-                                        className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all ${isApplied ? 'bg-cyan-50 text-[#06b6d4]' : 'bg-zinc-100 text-zinc-600 hover:bg-[#06b6d4] hover:text-white shadow-sm opacity-0 group-hover:opacity-100'}`}
-                                    >
-                                        {isApplied ? <Check size={16} /> : <Plus size={16} />}
-                                    </button>
-                                </div>
-                            );
-                        })}
+            {generatedBullets.summaryOptions?.length > 0 && (
+              <section className="space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-700">Professional summary</h3>
+                {generatedBullets.summaryOptions.map((option, index) => {
+                  const id = 'summary-' + index;
+                  const applied = appliedItems.has(id);
+                  return (
+                    <div key={id} className="rounded-xl border border-zinc-200 bg-white p-3 space-y-3">
+                      <p className="text-sm leading-relaxed text-zinc-800">{option}</p>
+                      <button disabled={applied} onClick={() => handleApplySummary(option, index)} className="text-xs font-semibold rounded-lg px-3 py-2 bg-cyan-50 text-cyan-800 disabled:opacity-60">
+                        {applied ? 'Applied' : 'Use this summary'}
+                      </button>
                     </div>
+                  );
+                })}
+              </section>
+            )}
+
+            {recommendations.map((group) => (
+              <section key={group.targetSectionKey + '-' + group.itemIndex} className="space-y-3">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-800">{group.sectionKey}</h3>
+                  <p className="text-xs text-zinc-500 mt-1">{group.itemTitle}</p>
                 </div>
-            )}
 
-            {!hasGranularData && (!generatedBullets.summaryOptions || generatedBullets.summaryOptions.length === 0) && (
-              <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-600">
-                The Copilot reviewed {generatedBullets.reviewedBulletCount || 0} resume bullets and found none that could be made materially better for this job without weakening accuracy. Your original resume remains unchanged.
-              </div>
-            )}
+                {group.bullets.map((bullet) => {
+                  const id = group.targetSectionKey + '-' + group.itemIndex + '-' + bullet.bulletIndex + '-' + bullet.action;
+                  const applied = appliedItems.has(id);
+                  return (
+                    <div key={id} className="rounded-xl border border-zinc-200 bg-white p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className={'text-[10px] font-bold uppercase tracking-wider ' + (bullet.action === 'remove' ? 'text-red-600' : 'text-cyan-700')}>
+                          {bullet.action === 'remove' ? 'Recommended removal' : 'Suggested improvement'}
+                        </span>
+                        {applied && <span className="text-[10px] font-semibold text-emerald-700">Applied</span>}
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-semibold text-zinc-400 mb-1">Current point</p>
+                        <p className="text-sm text-zinc-600 leading-relaxed">{bullet.original}</p>
+                      </div>
+                      {bullet.action === 'replace' && (
+                        <div>
+                          <p className="text-[10px] uppercase font-semibold text-cyan-700 mb-1">Improved for this JD</p>
+                          <p className="text-sm text-zinc-900 leading-relaxed">{bullet.text}</p>
+                        </div>
+                      )}
+                      {bullet.reason && <p className="text-[11px] text-zinc-500 leading-relaxed">{bullet.reason}</p>}
+                      <div className="flex flex-wrap gap-2 justify-end">
+                        {bullet.action === 'replace' && (
+                          <button disabled={applied} onClick={() => handleReplace(group, bullet, id)} className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-700 hover:bg-cyan-800 text-white px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                            <Check size={13} /> {applied ? 'Replaced' : 'Replace point'}
+                          </button>
+                        )}
+                        <button disabled={applied} onClick={() => handleRemove(group, bullet, id)} className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                          <Trash2 size={13} /> {applied && bullet.action === 'remove' ? 'Removed' : 'Remove point'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
 
-            {/* TAILORED BULLET POINTS */}
-            {generatedBullets.tailoredItems.map((itemGroup, idx) => (
-              <div key={idx} className="space-y-3 relative z-0">
-                  <h3 className="text-xs font-semibold text-sky-600 flex items-center gap-2 uppercase tracking-wider pl-1">
-                      {itemGroup.sectionKey}: {itemGroup.itemTitle}
-                  </h3>
-                  
-                  {itemGroup.suggestions?.map((suggestion, bIdx) => {
-                      const uniqueId = `replace-${itemGroup.targetSectionKey}-${itemGroup.itemIndex}-${suggestion.bulletIndex}`;
-                      const isApplied = appliedItems.has(uniqueId);
-                      return (
-                          <div key={uniqueId} className="p-4 bg-white border border-zinc-200 rounded-xl hover:border-cyan-200 transition-all relative z-0">
-                              <div className="space-y-2 pr-1">
-                                <div>
-                                  <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1">Original</p>
-                                  <p className="text-xs text-zinc-500 leading-relaxed line-through">{suggestion.original}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-700 mb-1">Improved for this job</p>
-                                  <p className="text-sm text-zinc-800 leading-relaxed">{suggestion.proposed}</p>
-                                </div>
-                              </div>
-                              <div className="flex justify-end mt-3">
-                                <button
-                                  type="button"
-                                  disabled={isApplied}
-                                  onClick={() => handleApplyBullet(itemGroup, suggestion, uniqueId)}
-                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${isApplied ? 'bg-cyan-50 text-cyan-700 cursor-default' : 'bg-zinc-900 text-white hover:bg-cyan-700'}`}
-                                >
-                                  <Check size={14} />
-                                  {isApplied ? 'Applied' : 'Replace original'}
-                                </button>
-                              </div>
-                          </div>
-                      );
-                  })}
-              </div>
+                {group.additions.map((addition, index) => {
+                  const id = group.targetSectionKey + '-' + group.itemIndex + '-add-' + index;
+                  const applied = appliedItems.has(id);
+                  return (
+                    <div key={id} className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50/40 p-3 space-y-3">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Suggested new point</span>
+                      <p className="text-sm leading-relaxed text-zinc-900">{addition.text}</p>
+                      {addition.reason && <p className="text-[11px] text-zinc-500">{addition.reason}</p>}
+                      <div className="flex justify-end">
+                        <button disabled={applied} onClick={() => handleAdd(group, addition, id)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                          <Plus size={13} /> {applied ? 'Added' : 'Add point'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
             ))}
+
+            {!hasChanges && (
+              <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
+                No changes were recommended. The AI kept the points it judged suitable for this job. If you expected suggestions, check the warning messages above or try again with the complete job description.
+              </div>
+            )}
           </div>
         )}
       </div>

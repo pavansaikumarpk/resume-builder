@@ -407,16 +407,11 @@ const magicTailor = async (req, res) => {
 
     addSectionTask('experience', 'Work Experience');
     addSectionTask('projects', 'Projects');
-    (resumeData.sections || []).forEach((section) => {
-      if (section.isCustom && ['list', 'bullets'].includes(section.type)) {
+    // Only tailor known bullet-bearing sections. Do not infer that arbitrary
+    // arrays (education, certifications, text blocks, metadata) are bullet lists.
+    (Array.isArray(resumeData.sections) ? resumeData.sections : []).forEach((section) => {
+      if (section?.isCustom && ['list', 'bullets'].includes(section.type)) {
         addSectionTask(section.key, section.title);
-      } else if (section.key) {
-        addSectionTask(section.key, section.title);
-      }
-    });
-    Object.keys(resumeData).forEach((key) => {
-      if (!['skills', 'sections', 'experience', 'projects'].includes(key)) {
-        addSectionTask(key, key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase()));
       }
     });
     const candidateContext = {

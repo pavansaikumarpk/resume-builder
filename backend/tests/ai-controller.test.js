@@ -76,7 +76,7 @@ test('reviews experience, projects, and explicitly supported custom bullet secti
     certifications: [{ name: 'Cloud cert', text: 'Certification details' }],
     customText: [{ title: 'About', text: 'This is prose, not a bullet list' }],
     customList: [{ title: 'Volunteering', description: ['Helped organize events'] }],
-    customBullets: [{ date: '2025', text: 'Mentored two students' }],
+    customBullets: ['Mentored two students'],
     skills: [{ category: 'Tools', items: [{ name: 'Git' }] }],
     sections: [
       { key: 'customText', title: 'About', isCustom: true, type: 'text' },

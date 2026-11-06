@@ -185,9 +185,9 @@ const optimizeArrayDataOnce = async (items, jd, sectionName, candidateContext = 
 
   const mapped = items.map((item, index) => ({
     _index: index,
-    title: item.title || item.company || item.name || item.position || item.institution || (sectionName + ' entry ' + (index + 1)),
-    role: item.position || item.jobTitle || item.degree || '',
-    bullets: normalizeBulletList(item.description ?? item.bulletPoints ?? item.text)
+    title: item?.title || item?.company || item?.name || item?.position || item?.institution || (sectionName + ' entry ' + (index + 1)),
+    role: item?.position || item?.jobTitle || item?.degree || '',
+    bullets: normalizeBulletList(typeof item === 'string' ? [item] : (item?.description ?? item?.bulletPoints ?? item?.text))
   })).filter((item) => item.bullets.length);
 
   if (!mapped.length) return { items, actions: [], changedCount: 0, reviewedCount: 0 };
@@ -317,12 +317,13 @@ const magicTailor = async (req, res) => {
   try {
     const sectionTasks = [];
     const seenKeys = new Set();
-    const addSectionTask = (key, title) => {
+    const addSectionTask = (key, title, allowStringPoints = false) => {
       if (!key || seenKeys.has(key) || !Array.isArray(resumeData[key])) return;
       const items = resumeData[key];
       const hasBulletContent = items.some((item) =>
-        item && typeof item === 'object' &&
-        (item.description !== undefined || item.bulletPoints !== undefined || item.text !== undefined)
+        (allowStringPoints && typeof item === 'string' && item.trim()) ||
+        (item && typeof item === 'object' &&
+          (item.description !== undefined || item.bulletPoints !== undefined || item.text !== undefined))
       );
       if (!hasBulletContent) return;
       seenKeys.add(key);
@@ -333,7 +334,7 @@ const magicTailor = async (req, res) => {
     addSectionTask('projects', 'Projects');
     (Array.isArray(resumeData.sections) ? resumeData.sections : []).forEach((section) => {
       if (section?.isCustom && ['list', 'bullets'].includes(section.type)) {
-        addSectionTask(section.key, section.title);
+        addSectionTask(section.key, section.title, section.type === 'bullets');
       }
     });
 

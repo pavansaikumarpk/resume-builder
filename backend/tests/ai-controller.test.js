@@ -1,6 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const axios = require('axios');
+
+// The controller validates AI configuration before making the HTTP request.
+// Tests use a dummy key because axios is mocked and no external request is made.
+process.env.GROQ_API_KEY = 'test-only-key';
 const { magicTailor } = require('../controllers/ai-controller');
 
 const makeResponse = () => {

@@ -158,7 +158,7 @@ test('isolates malformed section output to a warning while preserving valid summ
     }, response.res);
     const { statusCode, payload } = response.read();
     assert.equal(statusCode, 200);
-    assert.equal(calls, 3);
+    assert.equal(calls, 4, 'the malformed section is retried once before being isolated as a warning');
     assert.equal(payload.bulletActions.length, 1);
     assert.equal(payload.bulletActions[0].sectionKey, 'projects');
     assert.equal(payload.reviewedBulletCount, 1);

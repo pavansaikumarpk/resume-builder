@@ -67,7 +67,7 @@
 // };
 
 // // Processes arrays iteratively to circumvent truncation limits
-// const optimizeArrayData = async (items, jd, sectionName) => {
+// const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) => {
 //   if (!items || !items.length) return items;
 //   const sys = `You are an ATS optimization algorithm. Enhance the bullet points for ${sectionName}. 
 //   Return JSON EXACTLY matching the input array length. Schema: { "optimized": [ { "_index": 0, "bullets": ["Metric-driven accomplishment"] } ] }`;
@@ -347,6 +347,10 @@ const optimizeArrayData = async (items, jd, sectionName) => {
     if (result.bullets.length !== entry.bullets.length) {
       throw new Error('AI returned ' + result.bullets.length + ' decisions for ' + entry.bullets.length + ' source bullets in ' + sectionName + ' entry ' + (entry._index + 1) + '.');
     }
+    const returnedIndexes = result.bullets.map((candidate) => Number(candidate.bulletIndex));
+    if (returnedIndexes.some((index) => !Number.isInteger(index) || index < 0 || index >= entry.bullets.length) || new Set(returnedIndexes).size !== entry.bullets.length) {
+      throw new Error('AI returned duplicate or invalid bullet indexes for ' + sectionName + ' entry ' + (entry._index + 1) + '.');
+    }
     const entryActions = [];
     entry.bullets.forEach((sourceText, bulletIndex) => {
       const decision = result.bullets.find((candidate) => Number(candidate.bulletIndex) === bulletIndex);
@@ -414,9 +418,15 @@ const magicTailor = async (req, res) => {
         addSectionTask(key, key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase()));
       }
     });
+    const candidateContext = {
+      summary: resumeData.summary || '',
+      skills: resumeData.skills || [],
+      education: resumeData.education || [],
+      certifications: resumeData.certifications || []
+    };
     const [summaryResult, ...sectionResults] = await Promise.allSettled([
       optimizeSummary(resumeData.summary, jobDescription),
-      ...sectionTasks.map((section) => optimizeArrayData(section.items, jobDescription, section.title))
+      ...sectionTasks.map((section) => optimizeArrayData(section.items, jobDescription, section.title, candidateContext))
     ]);
     const warnings = [];
     let summaryOptions = [resumeData.summary].filter(Boolean);

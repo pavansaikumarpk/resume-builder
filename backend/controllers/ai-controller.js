@@ -205,9 +205,9 @@ const optimizeArrayDataOnce = async (items, jd, sectionName, candidateContext = 
     'Critical rules:',
     '- Actually compare candidate evidence with the job responsibilities and qualifications. Do not just paraphrase the original.',
     '- Do not return every bullet as KEEP to avoid doing the work. Actively look for truthful improvements.',
-    '- Do not change a bullet merely to insert keywords. A replacement must be better for THIS job.',
+    '- Do not change a bullet merely to insert keywords. A modification must be better for THIS job.',
     '- Never invent technologies, tools, metrics, scale, outcomes, responsibilities, employers, qualifications, or years of experience.',
-    '- Preserve factual meaning. Prefer KEEP or REPLACE when the point contains transferable evidence. REMOVE only genuinely irrelevant, redundant, or misleading points.',
+    '- Preserve factual meaning. Prefer KEEP or MODIFY when the point contains transferable evidence. REMOVE only genuinely irrelevant, redundant, or misleading points.',
     '- Review the complete entry and all supplied resume context before deciding. Do not judge a point in isolation.',
     '- Aim for 3–4 strong bullets per resume entry. Do not force the count: fewer are better than invented or weak points.',
     '- When an entry has more than 4 bullets, prioritize the strongest 3–4 for this job. REMOVE lower-value, off-target, or repetitive bullets only when doing so improves focus without discarding unique meaningful evidence.',
@@ -228,7 +228,7 @@ const optimizeArrayDataOnce = async (items, jd, sectionName, candidateContext = 
   const prompt = 'JOB DESCRIPTION (the only target for this tailoring run):\n' + jd +
     '\n\nADDITIONAL VERIFIED RESUME CONTEXT (use only to support relevant additions; do not infer unlisted experience):\n' + JSON.stringify(candidateContext) +
     '\n\nCANDIDATE RESUME FACTS FOR THIS SECTION:\n' + JSON.stringify(mapped) +
-    '\n\nReview all entries and every bullet. Return exactly one KEEP, REPLACE, or REMOVE decision for every source bullet. ADDITIONS are separate new bullets, only when evidence-backed and needed to reach 3–4 strong bullets per entry; never exceed 4 total. ' + retryFeedback + ' The company and role can be from any industry; do not assume a specific company or technology.';
+    '\n\nReview all entries and every bullet. Return exactly one KEEP, MODIFY, or REMOVE decision for every source bullet. ADDITIONS are separate new bullets, only when evidence-backed and needed to reach 3–4 strong bullets per entry; never exceed 4 total. ' + retryFeedback + ' The company and role can be from any industry; do not assume a specific company or technology.';
 
   const raw = await callAIEngineWithRetry(prompt, systemInstruction, { maxTokens: 4200, temperature: 0.25, jsonSchema: BULLET_REVIEW_RESPONSE_SCHEMA, schemaName: 'resume_bullet_review' });
   const parsed = extractCleanJSON(raw);

@@ -552,7 +552,7 @@ export const useResumeStore = create((set, get) => ({
 
     if (section?.type === 'bullets') {
       const point = currentItems[itemIndex];
-      const currentText = typeof point === 'string' ? point.trim() : String(point?.text ?? point?.description ?? '').trim();
+      const currentText = typeof point === 'string' ? point.trim() : String(point?.text ?? point?.description ?? point?.content ?? '').trim();
       if (currentText !== expected) return false;
       const updatedItems = [...currentItems];
       if (point && typeof point === 'object' && !Array.isArray(point)) {
@@ -599,7 +599,7 @@ export const useResumeStore = create((set, get) => ({
     const section = (activeResume.resumeData.sections || []).find((entry) => entry.key === sectionKey);
     if (section?.type === 'bullets') {
       const point = currentItems[itemIndex];
-      const currentText = typeof point === 'string' ? point : String(point?.text || '');
+      const currentText = typeof point === 'string' ? point : String(point?.text ?? point?.description ?? point?.content ?? '');
       if (currentText.trim() !== String(expectedOriginal || '').trim()) return false;
       const updatedItems = [...currentItems];
       updatedItems.splice(itemIndex, 1);
@@ -636,7 +636,7 @@ export const useResumeStore = create((set, get) => ({
 
     if (section?.type === 'bullets') {
       const exists = currentItems.some((point) => {
-        const value = typeof point === 'string' ? point : point?.text;
+        const value = typeof point === 'string' ? point : (point?.text ?? point?.description ?? point?.content);
         return String(value || '').trim().toLowerCase() === text.trim().toLowerCase();
       });
       if (exists) return false;

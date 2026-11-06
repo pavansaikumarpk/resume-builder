@@ -294,7 +294,7 @@ const normalizeBulletList = (value) => {
   }).filter(Boolean);
 };
 
-const optimizeArrayData = async (items, jd, sectionName) => {
+const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) => {
   if (!Array.isArray(items) || !items.length) return { items: items || [], actions: [], changedCount: 0, reviewedCount: 0 };
 
   const mapped = items.map((item, index) => ({

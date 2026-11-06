@@ -219,7 +219,8 @@ export const AnalysisPanel = () => {
   };
 
   const recommendations = generatedBullets?.tailoredItems || [];
-  const hasChanges = recommendations.length > 0 || (generatedBullets?.summaryOptions || []).length > 0;
+  const hasChanges = recommendations.some((group) => group.bullets.length || group.additions.length) || (generatedBullets?.summaryOptions || []).length > 0;
+  const keptCount = recommendations.reduce((total, group) => total + (group.keptBullets?.length || 0), 0);
 
   return (
     <div className="h-full flex flex-col bg-[#fbfdff] font-sans">
@@ -344,6 +345,21 @@ export const AnalysisPanel = () => {
                   );
                 })}
 
+                {group.keptBullets?.length > 0 && (
+                  <details className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
+                    <summary className="cursor-pointer text-xs font-semibold text-zinc-600">
+                      Keep {group.keptBullets.length} suitable {group.keptBullets.length === 1 ? 'point' : 'points'} unchanged
+                    </summary>
+                    <ul className="mt-2 space-y-2">
+                      {group.keptBullets.map((bullet) => (
+                        <li key={bullet.bulletIndex} className="text-xs leading-relaxed text-zinc-600">
+                          <span className="mr-1 text-emerald-600">✓</span>{bullet.original}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+
                 {group.additions.map((addition, index) => {
                   const id = group.targetSectionKey + '-' + group.itemIndex + '-add-' + index;
                   const applied = appliedItems.has(id);
@@ -371,7 +387,7 @@ export const AnalysisPanel = () => {
 
             {!hasChanges && (
               <div className="rounded-xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
-                No changes were recommended. The AI kept the points it judged suitable for this job. If you expected suggestions, check the warning messages above or try again with the complete job description.
+                No edits were recommended. The AI marked {keptCount} existing points as suitable to keep unchanged. Review the kept points above; nothing was changed in your resume.
               </div>
             )}
           </div>

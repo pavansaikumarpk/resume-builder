@@ -513,3 +513,27 @@ test('mixed decisions keep one action per source bullet and additions remain sep
     assert.equal(payload.bulletActions[0].additions.length, 1);
   });
 });
+
+
+test('reports Groq HTTP 400 provider message instead of Axios generic text', async () => {
+  let calls = 0;
+  await withAxiosMock(async () => {
+    calls += 1;
+    const error = new Error('Request failed with status code 400');
+    error.response = { status: 400, data: { error: { message: 'temperature is not supported for this model' } } };
+    throw error;
+  }, async () => {
+    const response = makeResponse();
+    await magicTailor({
+      body: {
+        jobDescription: 'A sufficiently long target job description',
+        resumeData: { summary: 'Original summary', experience: [], projects: [] }
+      }
+    }, response.res);
+    const { statusCode, payload } = response.read();
+    assert.equal(statusCode, 200);
+    assert.equal(payload.warnings.length, 1);
+    assert.match(payload.warnings[0], /Groq API returned HTTP 400: temperature is not supported/i);
+    assert.equal(calls, 1, 'non-retryable request errors must not waste backup-model quota');
+  });
+});

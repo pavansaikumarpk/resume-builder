@@ -43,9 +43,10 @@ const callAIEngineWithRetry = async (prompt, systemInstruction, options = {}, re
             { role: "system", content: systemInstruction },
             { role: "user", content: prompt }
           ],
-          ...(modelName.startsWith("openai/gpt-oss-") ? {} : { temperature: options.temperature ?? 0.4 }),
+          temperature: options.temperature ?? 0.4,
           response_format: options.jsonMode !== false ? { type: "json_object" } : undefined,
-          max_tokens: options.maxTokens || 4096
+          ...(modelName.startsWith("openai/gpt-oss-") && options.jsonMode !== false ? { reasoning_format: "hidden" } : {}),
+          max_completion_tokens: options.maxTokens || 4096
         }, {
           headers: {
             Authorization: `Bearer ${apiKey}`,

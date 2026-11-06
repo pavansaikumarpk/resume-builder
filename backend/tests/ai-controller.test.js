@@ -380,7 +380,7 @@ test('does not switch Groq models for invalid API credentials', async () => {
 });
 
 
-test('does not send temperature for GPT-OSS and exposes provider error details', async () => {
+test('sets GPT-OSS JSON reasoning format and sends the supported token limit parameter', async () => {
   let sentBody;
   await withAxiosMock(async (_url, body) => {
     sentBody = body;
@@ -395,8 +395,11 @@ test('does not send temperature for GPT-OSS and exposes provider error details',
     }, response.res);
     assert.equal(response.read().statusCode, 200);
   });
-  assert.equal(Object.hasOwn(sentBody, 'temperature'), false);
+  assert.equal(sentBody.temperature, 0.2);
   assert.equal(sentBody.response_format.type, 'json_object');
+  assert.equal(sentBody.reasoning_format, 'hidden');
+  assert.equal(sentBody.max_completion_tokens, 900);
+  assert.equal(Object.hasOwn(sentBody, 'max_tokens'), false);
 });
 
 test('caps evidence-backed additions at four total bullets per resume entry', async () => {

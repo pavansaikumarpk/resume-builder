@@ -43,7 +43,7 @@ const callAIEngineWithRetry = async (prompt, systemInstruction, options = {}, re
             { role: "system", content: systemInstruction },
             { role: "user", content: prompt }
           ],
-          temperature: options.temperature ?? 0.4,
+          ...(modelName.startsWith("openai/gpt-oss-") ? {} : { temperature: options.temperature ?? 0.4 }),
           response_format: options.jsonMode !== false ? { type: "json_object" } : undefined,
           max_tokens: options.maxTokens || 4096
         }, {
@@ -83,6 +83,11 @@ const callAIEngineWithRetry = async (prompt, systemInstruction, options = {}, re
     }
   }
 
+  if (lastError?.response) {
+    const status = lastError.response.status;
+    const providerMessage = lastError.response.data?.error?.message || lastError.response.data?.message || lastError.message;
+    lastError.message = `Groq API returned HTTP ${status}: ${providerMessage}`;
+  }
   throw lastError || new Error("All configured Groq models failed.");
 };
 
@@ -146,7 +151,7 @@ const normalizeBulletList = (value) => {
   }).filter(Boolean);
 };
 
-const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) => {
+const optimizeArrayDataOnce = async (items, jd, sectionName, candidateContext = {}, retryFeedback = '') => {
   if (!Array.isArray(items) || !items.length) return { items: items || [], actions: [], changedCount: 0, reviewedCount: 0 };
 
   const mapped = items.map((item, index) => ({
@@ -165,7 +170,7 @@ const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) 
     'For EVERY candidate bullet, make one explicit decision:',
     'KEEP: The bullet is already relevant and strong enough. Keep its wording exactly.',
     'REPLACE: Relevant evidence exists, but focus, clarity, specificity, or impact can be materially improved for this job. Write the improved bullet.',
-    'REMOVE: The bullet is irrelevant, redundant, misleading, or too weak to improve truthfully. Recommend removal, but never delete automatically.',
+    'REMOVE: Use only when the point is genuinely irrelevant to this target role, materially redundant, or misleading. Do not remove merely because its technology differs from the job description.',
     '',
     'Also suggest ADDITIONS only when a meaningful resume point can be assembled from facts explicitly present elsewhere in the supplied candidate data.',
     'Critical rules:',
@@ -173,7 +178,12 @@ const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) 
     '- Do not return every bullet as KEEP to avoid doing the work. Actively look for truthful improvements.',
     '- Do not change a bullet merely to insert keywords. A replacement must be better for THIS job.',
     '- Never invent technologies, tools, metrics, scale, outcomes, responsibilities, employers, qualifications, or years of experience.',
-    '- Preserve factual meaning. A bullet may be unrelated to the JD; if it cannot be honestly improved, recommend REMOVE.',
+    '- Preserve factual meaning. Prefer KEEP or REPLACE when the point contains transferable evidence. REMOVE only genuinely irrelevant, redundant, or misleading points.',
+    '- Review the complete entry and all supplied resume context before deciding. Do not judge a point in isolation.',
+    '- Aim for 3–4 strong bullets per resume entry. Do not force the count: fewer are better than invented or weak points.',
+    '- Add only when the entry would otherwise have fewer than 3 strong bullets AND a distinct, relevant achievement is explicitly supported by other supplied resume facts.',
+    '- Never add a duplicate or split one achievement into multiple weak bullets. Do not exceed 4 bullets per entry in the final plan.',
+    '- If the entry already has 3 or 4 strong bullets, do not add more.',
     '- A new addition must be directly supported by supplied resume facts. If none exists, return an empty additions array.',
     '- Use concise, strong, ATS-readable language. Avoid generic claims and keyword stuffing.',
     '- Every input bullet must appear exactly once, identified by its original bullet index.',
@@ -185,7 +195,7 @@ const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) 
   const prompt = 'JOB DESCRIPTION (the only target for this tailoring run):\n' + jd +
     '\n\nADDITIONAL VERIFIED RESUME CONTEXT (use only to support relevant additions; do not infer unlisted experience):\n' + JSON.stringify(candidateContext) +
     '\n\nCANDIDATE RESUME FACTS FOR THIS SECTION:\n' + JSON.stringify(mapped) +
-    '\n\nReview all entries and every bullet. Return a decision for every bullet and only evidence-backed additions. The company and role can be from any industry; do not assume a specific company or technology.';
+    '\n\nReview all entries and every bullet. Return exactly one KEEP, REPLACE, or REMOVE decision for every source bullet. ADDITIONS are separate new bullets, only when evidence-backed and needed to reach 3–4 strong bullets per entry; never exceed 4 total. ' + retryFeedback + ' The company and role can be from any industry; do not assume a specific company or technology.';
 
   const raw = await callAIEngineWithRetry(prompt, systemInstruction, { maxTokens: 4200, temperature: 0.25 });
   const parsed = extractCleanJSON(raw);
@@ -234,15 +244,31 @@ const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) 
         reason: String(decision.reason || '').slice(0, 220)
       });
     });
+    const retainedCount = entryActions.filter((item) => item.action !== 'remove').length;
+    const additionCapacity = Math.max(0, 4 - retainedCount);
     const additions = Array.isArray(result.additions)
-      ? result.additions.filter((item) => typeof item?.text === 'string' && item.text.trim()).slice(0, 3)
+      ? result.additions.filter((item) => typeof item?.text === 'string' && item.text.trim())
+          .filter((item) => !entry.bullets.some((source) => source.toLowerCase() === item.text.trim().toLowerCase()))
+          .slice(0, additionCapacity)
           .map((item) => ({ text: item.text.trim(), reason: String(item.reason || '').slice(0, 220) }))
       : [];
     changedCount += additions.length;
     actions.push({ sectionIndex: entry._index, itemTitle: entry.title, bullets: entryActions, additions });
   });
   return { items, actions, changedCount, reviewedCount };
-};// ============================================================================
+};
+
+const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) => {
+  try {
+    return await optimizeArrayDataOnce(items, jd, sectionName, candidateContext);
+  } catch (error) {
+    if (!/AI returned|AI omitted/.test(error.message || '')) throw error;
+    return optimizeArrayDataOnce(items, jd, sectionName, candidateContext,
+      `Your previous response failed validation: ${error.message}. Return every original bullet index exactly once, with no missing or duplicate decisions. Output valid JSON only.`);
+  }
+};
+
+// ============================================================================
 // ENDPOINTS
 // ============================================================================
 

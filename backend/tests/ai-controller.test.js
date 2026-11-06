@@ -540,3 +540,30 @@ test('reports Groq HTTP 400 provider message instead of Axios generic text', asy
     assert.equal(calls, 1, 'non-retryable request errors must not waste backup-model quota');
   });
 });
+
+
+test('prevents additions from being copied across unrelated employers or projects', async () => {
+  let systemPrompt = '';
+  await withAxiosMock(async (_url, body) => {
+    const prompt = body.messages[1].content;
+    if (prompt.includes('VERIFIED RESUME FACTS')) {
+      return { data: { choices: [{ message: { content: JSON.stringify({ options: ['Summary'] }) } }] } };
+    }
+    systemPrompt = body.messages[0].content;
+    return { data: { choices: [{ message: { content: validSectionResponse(prompt) } }] } };
+  }, async () => {
+    const response = makeResponse();
+    await magicTailor({
+      body: {
+        jobDescription: 'A sufficiently long target job description',
+        resumeData: {
+          summary: 'Engineer',
+          experience: [{ company: 'Acme', description: ['Built an internal tool'] }],
+          projects: [{ title: 'Personal project', description: ['Built a separate portfolio app'] }]
+        }
+      }
+    }, response.res);
+    assert.equal(response.read().statusCode, 200);
+  });
+  assert.match(systemPrompt, /must belong to THIS exact employer, project, or activity entry/i);
+});

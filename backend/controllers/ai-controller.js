@@ -61,7 +61,14 @@ const callAIEngineWithRetry = async (prompt, systemInstruction, options = {}, re
         return responseContent;
       } catch (error) {
         lastError = error;
-        if (!isRetryableGroqError(error)) throw error;
+        if (!isRetryableGroqError(error)) {
+          if (error.response) {
+            const status = error.response.status;
+            const providerMessage = error.response.data?.error?.message || error.response.data?.message || error.message;
+            error.message = `Groq API returned HTTP ${status}: ${providerMessage}`;
+          }
+          throw error;
+        }
 
         const status = error.response?.status;
         // A retired model or exhausted per-model quota should immediately
@@ -245,7 +252,7 @@ const optimizeArrayDataOnce = async (items, jd, sectionName, candidateContext = 
       });
     });
     const retainedCount = entryActions.filter((item) => item.action !== 'remove').length;
-    const additionCapacity = Math.max(0, 4 - retainedCount);
+    const additionCapacity = Math.max(0, Math.min(2, 4 - retainedCount));
     const additions = Array.isArray(result.additions)
       ? result.additions.filter((item) => typeof item?.text === 'string' && item.text.trim())
           .filter((item) => !entry.bullets.some((source) => source.toLowerCase() === item.text.trim().toLowerCase()))

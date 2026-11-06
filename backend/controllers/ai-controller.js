@@ -356,8 +356,17 @@ const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) 
   const actions = [];
   let changedCount = 0;
   let reviewedCount = 0;
+  const returnedEntryIndexes = parsed.entries.map((candidate) => Number(candidate?._index));
+  if (
+    parsed.entries.length !== mapped.length ||
+    returnedEntryIndexes.some((index) => !Number.isInteger(index) || index < 0 || index >= items.length) ||
+    new Set(returnedEntryIndexes).size !== mapped.length
+  ) {
+    throw new Error('AI returned duplicate, missing, or invalid entry indexes for ' + sectionName + '.');
+  }
+
   mapped.forEach((entry) => {
-    const result = parsed.entries.find((candidate) => candidate._index === entry._index);
+    const result = parsed.entries.find((candidate) => Number(candidate._index) === entry._index);
     if (!result || !Array.isArray(result.bullets)) throw new Error('AI omitted ' + sectionName + ' entry ' + (entry._index + 1) + '.');
     if (result.bullets.length !== entry.bullets.length) {
       throw new Error('AI returned ' + result.bullets.length + ' decisions for ' + entry.bullets.length + ' source bullets in ' + sectionName + ' entry ' + (entry._index + 1) + '.');
@@ -400,9 +409,12 @@ const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) 
 // ============================================================================
 
 const magicTailor = async (req, res) => {
-  const { jobDescription, resumeData } = req.body;
-  if (!jobDescription || !String(jobDescription).trim() || !resumeData) {
-    return res.status(400).json({ success: false, error: "Paste a job description and load a resume first." });
+  const { jobDescription, resumeData } = req.body || {};
+  if (typeof jobDescription !== 'string' || jobDescription.trim().length < 20 || jobDescription.length > 30000) {
+    return res.status(400).json({ success: false, error: "Paste a job description between 20 and 30,000 characters." });
+  }
+  if (!resumeData || typeof resumeData !== 'object' || Array.isArray(resumeData)) {
+    return res.status(400).json({ success: false, error: "A valid resume is required before tailoring." });
   }
   try {
     const sectionTasks = [];

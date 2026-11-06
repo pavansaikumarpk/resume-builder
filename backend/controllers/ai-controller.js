@@ -189,6 +189,8 @@ const optimizeArrayDataOnce = async (items, jd, sectionName, candidateContext = 
     '- Preserve factual meaning. Prefer KEEP or REPLACE when the point contains transferable evidence. REMOVE only genuinely irrelevant, redundant, or misleading points.',
     '- Review the complete entry and all supplied resume context before deciding. Do not judge a point in isolation.',
     '- Aim for 3–4 strong bullets per resume entry. Do not force the count: fewer are better than invented or weak points.',
+    '- When an entry has more than 4 bullets, prioritize the strongest 3–4 for this job. REMOVE lower-value, off-target, or repetitive bullets only when doing so improves focus without discarding unique meaningful evidence.',
+    '- If 5+ bullets are all distinct and materially valuable, preserve the unique evidence rather than deleting a good point just to hit a number.',
     '- Add only when the entry would otherwise have fewer than 3 strong bullets AND a distinct, relevant achievement is explicitly supported by supplied resume facts.',
     '- An added point must belong to THIS exact employer, project, or activity entry. Use the rest of the resume to cross-check facts and avoid duplication, never to transfer a project achievement into a job or another employer.',
     '- A skill listed elsewhere is not proof that the candidate used it in this entry. Never invent attribution, responsibilities, or context.',

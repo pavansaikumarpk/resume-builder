@@ -383,14 +383,34 @@ const magicTailor = async (req, res) => {
     return res.status(400).json({ success: false, error: "Paste a job description and load a resume first." });
   }
   try {
-    const customSections = (resumeData.sections || []).filter((section) =>
-      section.isCustom && ['list', 'bullets'].includes(section.type)
-    );
-    const sectionTasks = [
-      { key: 'experience', title: 'Work Experience', items: resumeData.experience || [] },
-      { key: 'projects', title: 'Projects', items: resumeData.projects || [] },
-      ...customSections.map((section) => ({ key: section.key, title: section.title, items: resumeData[section.key] || [] }))
-    ];
+    const sectionTasks = [];
+    const seenKeys = new Set();
+    const addSectionTask = (key, title) => {
+      if (!key || seenKeys.has(key) || !Array.isArray(resumeData[key])) return;
+      const items = resumeData[key];
+      const hasBulletContent = items.some((item) =>
+        item && typeof item === 'object' &&
+        (item.description !== undefined || item.bulletPoints !== undefined || item.text !== undefined)
+      );
+      if (!hasBulletContent) return;
+      seenKeys.add(key);
+      sectionTasks.push({ key, title: title || key, items });
+    };
+
+    addSectionTask('experience', 'Work Experience');
+    addSectionTask('projects', 'Projects');
+    (resumeData.sections || []).forEach((section) => {
+      if (section.isCustom && ['list', 'bullets'].includes(section.type)) {
+        addSectionTask(section.key, section.title);
+      } else if (section.key) {
+        addSectionTask(section.key, section.title);
+      }
+    });
+    Object.keys(resumeData).forEach((key) => {
+      if (!['skills', 'sections', 'experience', 'projects'].includes(key)) {
+        addSectionTask(key, key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase()));
+      }
+    });
     const [summaryResult, ...sectionResults] = await Promise.allSettled([
       optimizeSummary(resumeData.summary, jobDescription),
       ...sectionTasks.map((section) => optimizeArrayData(section.items, jobDescription, section.title))

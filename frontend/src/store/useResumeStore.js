@@ -403,6 +403,7 @@ export const useResumeStore = create((set, get) => ({
         generatedBullets: {
           success: true,
           summaryOptions,
+          sourceSummary: activeResume.resumeData.summary || '',
           tailoredItems,
           warnings,
           changedBulletCount,

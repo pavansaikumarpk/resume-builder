@@ -302,3 +302,79 @@ test('rejects duplicate or missing resume entry indexes from the model', async (
     assert.match(payload.warnings[0], /duplicate, missing, or invalid entry indexes/);
   });
 });
+
+
+test('uses Groq only and falls back from GPT-OSS 120B to GPT-OSS 20B when the primary model is unavailable', async () => {
+  const requests = [];
+  const originalEnv = {
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+    AI_BASE_URL: process.env.AI_BASE_URL,
+    AI_MODEL_NAME: process.env.AI_MODEL_NAME
+  };
+  process.env.OPENAI_API_KEY = 'must-not-be-used';
+  process.env.OPENROUTER_API_KEY = 'must-not-be-used';
+  process.env.AI_BASE_URL = 'https://not-groq.example/v1/chat/completions';
+  process.env.AI_MODEL_NAME = 'not-a-groq-model';
+
+  try {
+    await withAxiosMock(async (url, body, config) => {
+      requests.push({ url, model: body.model, authorization: config.headers.Authorization });
+      if (body.model === 'openai/gpt-oss-120b') {
+        const error = new Error('Model not found');
+        error.response = { status: 404 };
+        throw error;
+      }
+      return {
+        data: {
+          choices: [{ message: { content: JSON.stringify({ options: ['Backup model summary'] }) } }]
+        }
+      };
+    }, async () => {
+      const response = makeResponse();
+      await magicTailor({
+        body: {
+          jobDescription: 'A sufficiently long target job description',
+          resumeData: { summary: 'Original summary', experience: [], projects: [] }
+        }
+      }, response.res);
+      const { statusCode, payload } = response.read();
+      assert.equal(statusCode, 200);
+      assert.deepEqual(payload.summaryOptions, ['Backup model summary']);
+    });
+
+    assert.equal(requests.length, 2);
+    assert.deepEqual(requests.map((request) => request.model), [
+      'openai/gpt-oss-120b',
+      'openai/gpt-oss-20b'
+    ]);
+    assert.ok(requests.every((request) => request.url === 'https://api.groq.com/openai/v1/chat/completions'));
+    assert.ok(requests.every((request) => request.authorization === 'Bearer test-only-key'));
+  } finally {
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+test('does not switch Groq models for invalid API credentials', async () => {
+  let calls = 0;
+  await withAxiosMock(async () => {
+    calls += 1;
+    const error = new Error('Unauthorized');
+    error.response = { status: 401 };
+    throw error;
+  }, async () => {
+    const response = makeResponse();
+    await magicTailor({
+      body: {
+        jobDescription: 'A sufficiently long target job description',
+        resumeData: { summary: 'Original summary', experience: [], projects: [] }
+      }
+    }, response.res);
+    assert.equal(response.read().statusCode, 200);
+    assert.equal(response.read().payload.warnings.length, 1);
+    assert.equal(calls, 1);
+  });
+});

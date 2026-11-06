@@ -599,10 +599,12 @@ export const useResumeStore = create((set, get) => ({
     const section = (activeResume.resumeData.sections || []).find((entry) => entry.key === sectionKey);
 
     if (section?.type === 'bullets') {
-      const updatedItems = [...currentItems];
-      const referencePoint = Number.isInteger(itemIndex) ? currentItems[itemIndex] : null;
-      const date = referencePoint && typeof referencePoint === 'object' ? (referencePoint.date || '') : '';
-      updatedItems.splice(Number.isInteger(itemIndex) ? itemIndex + 1 : updatedItems.length, 0, { date, text: text.trim() });
+      const exists = currentItems.some((point) => {
+        const value = typeof point === 'string' ? point : point?.text;
+        return String(value || '').trim().toLowerCase() === text.trim().toLowerCase();
+      });
+      if (exists) return false;
+      const updatedItems = [...currentItems, { date: '', text: text.trim() }];
       updateResumeData({ ...activeResume.resumeData, [sectionKey]: updatedItems });
       return true;
     }
@@ -613,6 +615,7 @@ export const useResumeStore = create((set, get) => ({
     const currentValue = targetItem[field];
     const isArray = Array.isArray(currentValue);
     const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\n').filter(Boolean);
+    if (bulletList.some((bullet) => String(bullet || '').trim().toLowerCase() === text.trim().toLowerCase())) return false;
     bulletList.push(text.trim());
     const updatedItems = [...currentItems];
     updatedItems[itemIndex] = { ...targetItem, [field]: isArray ? bulletList : bulletList.join('\n') };

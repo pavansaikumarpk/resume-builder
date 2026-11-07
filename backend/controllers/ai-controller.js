@@ -515,28 +515,37 @@ const magicTailor = async (req, res) => {
   if (!resumeData || typeof resumeData !== 'object' || Array.isArray(resumeData)) {
     return res.status(400).json({ success: false, error: "A valid resume is required before tailoring." });
   }
-
   try {
     const sectionTasks = [];
+    const textSectionTasks = [];
     const seenKeys = new Set();
-    const addSectionTask = (key, title, allowStringPoints = false) => {
+    const addBulletSectionTask = (key, title, allowStringPoints = false) => {
       if (!key || seenKeys.has(key) || !Array.isArray(resumeData[key])) return;
       const items = resumeData[key];
       const hasBulletContent = items.some((item) =>
         (allowStringPoints && typeof item === 'string' && item.trim()) ||
-        (item && typeof item === 'object' &&
-          (item.description !== undefined || item.bulletPoints !== undefined || item.text !== undefined))
+        (item && typeof item === 'object' && (item.description !== undefined || item.bulletPoints !== undefined || item.text !== undefined))
       );
       if (!hasBulletContent) return;
       seenKeys.add(key);
       sectionTasks.push({ key, title: title || key, items });
     };
 
-    addSectionTask('experience', 'Work Experience');
-    addSectionTask('projects', 'Projects');
-    (Array.isArray(resumeData.sections) ? resumeData.sections : []).forEach((section) => {
-      if (section?.isCustom && ['list', 'bullets'].includes(section.type)) {
-        addSectionTask(section.key, section.title, section.type === 'bullets');
+    // Tailor-able content only. Personal details, education, and certifications stay untouched.
+    textSectionTasks.push({ key: 'summary', title: 'Professional Summary', original: typeof resumeData.summary === 'string' ? resumeData.summary : '' });
+    addBulletSectionTask('experience', 'Work Experience');
+    addBulletSectionTask('projects', 'Projects');
+
+    const customSections = Array.isArray(resumeData.sections)
+      ? resumeData.sections.filter((section) => section?.isCustom && section.key)
+      : [];
+    customSections.forEach((section) => {
+      if (section.type === 'text') {
+        textSectionTasks.push({ key: section.key, title: section.title || section.key, original: typeof resumeData[section.key] === 'string' ? resumeData[section.key] : '' });
+      } else if (section.type === 'list') {
+        addBulletSectionTask(section.key, section.title);
+      } else if (section.type === 'bullets') {
+        addBulletSectionTask(section.key, section.title, true);
       }
     });
 
@@ -545,54 +554,53 @@ const magicTailor = async (req, res) => {
       experience: resumeData.experience || [],
       projects: resumeData.projects || [],
       skills: resumeData.skills || [],
-      education: resumeData.education || [],
-      certifications: resumeData.certifications || []
+      customSections: customSections.map((section) => ({
+        title: section.title || section.key, type: section.type, content: resumeData[section.key]
+      }))
     };
 
-    // A review only succeeds when EVERY selected section has been analyzed.
-    // Do not return a partial plan that could look complete to the user.
-    const sectionResults = await Promise.all(
-      sectionTasks.map((section) =>
-        optimizeArrayData(section.items, jobDescription, section.title, candidateContext)
-      )
-    );
+    const [bulletResults, textResults, skillsResult] = await Promise.all([
+      Promise.all(sectionTasks.map((section) => optimizeArrayData(section.items, jobDescription, section.title, candidateContext))),
+      Promise.all(textSectionTasks.map((section) => reviewTextSection({
+        sectionKey: section.key, sectionTitle: section.title, original: section.original, jd: jobDescription, candidateContext
+      }))),
+      reviewSkills(resumeData.skills || [], jobDescription, candidateContext)
+    ]);
 
     const bulletActions = [];
     let reviewedBulletCount = 0;
     let changedBulletCount = 0;
-    sectionResults.forEach((result, index) => {
+    bulletResults.forEach((result, index) => {
       const section = sectionTasks[index];
       reviewedBulletCount += result.reviewedCount;
       changedBulletCount += result.changedCount;
-      result.actions.forEach((entry) => {
-        bulletActions.push({
-          sectionKey: section.key,
-          sectionTitle: section.title,
-          itemIndex: entry.sectionIndex,
-          itemTitle: entry.itemTitle,
-          bullets: entry.bullets,
-          additions: entry.additions
-        });
-      });
+      result.actions.forEach((entry) => bulletActions.push({
+        sectionKey: section.key, sectionTitle: section.title, itemIndex: entry.sectionIndex,
+        itemTitle: entry.itemTitle, bullets: entry.bullets, additions: entry.additions
+      }));
     });
 
+    const sectionReviews = textResults;
+    const reviewedSkillCount = skillsResult.reviewedCount;
+    const reviewedPointCount = reviewedBulletCount + reviewedSkillCount + sectionReviews.length;
+    changedBulletCount += skillsResult.actions.filter((item) => item.action !== 'keep').length;
+    changedBulletCount += skillsResult.additions.length;
+    changedBulletCount += sectionReviews.filter((item) => item.action !== 'keep').length;
+
     return res.status(200).json({
-      success: true,
-      tailoredData: resumeData,
-      bulletActions,
-      changedBulletCount,
-      reviewedBulletCount,
-      atsScore: null
+      success: true, tailoredData: resumeData, sectionReviews, bulletActions,
+      skillActions: skillsResult.actions, skillAdditions: skillsResult.additions,
+      changedBulletCount, reviewedBulletCount, reviewedSkillCount,
+      reviewedTextSectionCount: sectionReviews.length, reviewedPointCount, atsScore: null
     });
   } catch (error) {
     console.error("JD tailoring failure:", error);
     return res.status(500).json({
       success: false,
-      error: "Resume review could not be completed. " + (error.message || "AI review failed.") + " No resume content was changed."
+      error: "The full resume review could not be completed. " + (error.message || "AI review failed.") + " No resume content was changed."
     });
   }
 };
-
 const optimizeBullet = async (req, res) => {
   const { bulletText, jobDescription } = req.body;
   if (!bulletText) return res.status(400).json({ success: false, error: "Insufficient text." });

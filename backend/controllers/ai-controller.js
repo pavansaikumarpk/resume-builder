@@ -345,6 +345,55 @@ const optimizeArrayDataOnce = async (items, jd, sectionName, candidateContext = 
   return { items, actions, changedCount, reviewedCount };
 };
 
+
+const reviewTextSection = async ({ sectionKey, sectionTitle, original, jd, candidateContext }) => {
+  const sourceText = String(original || '').trim();
+  const systemInstruction = [
+    'You are a meticulous resume reviewer. Review one complete resume text section for fit to the exact target job description.',
+    'Return one decision: KEEP if the text is already clear, relevant, and strong; MODIFY if it can be materially improved without changing facts; REMOVE only if it is misleading, redundant, or genuinely unhelpful; ADD when the section is blank and a useful version can be written from verified resume evidence.',
+    'For an existing good summary, explicitly choose KEEP and explain briefly why no change is needed.',
+    'Never invent skills, tools, metrics, years, seniority, employers, achievements, outcomes, or responsibilities.',
+    'Use experience, projects, skills, and other included resume content only as evidence. Education and certifications are excluded from this review.',
+    'For an empty section, write a draft only when the supplied resume evidence supports it. If evidence is insufficient, use REMOVE with an explanation and empty text.',
+    'Keep a modified section concise and specific to the target job. Do not keyword-stuff.',
+    'Return strict JSON matching the required schema.'
+  ].join('\n');
+  const prompt = 'TARGET JOB DESCRIPTION:\n' + jd +
+    '\n\nSECTION TO REVIEW: ' + sectionTitle +
+    '\nCURRENT CONTENT:\n' + (sourceText || '[EMPTY]') +
+    '\n\nOTHER INCLUDED RESUME EVIDENCE (for fact-checking only):\n' + JSON.stringify(candidateContext) +
+    '\n\nChoose exactly one action for this section. The section is not changed automatically.';
+  const raw = await callAIEngineWithRetry(prompt, systemInstruction, {
+    maxTokens: 1300,
+    temperature: 0.2,
+    jsonSchema: TEXT_SECTION_REVIEW_SCHEMA,
+    schemaName: 'resume_text_section_review'
+  });
+  const parsed = extractCleanJSON(raw);
+  const review = parsed.review;
+  if (!review || !['keep', 'modify', 'remove', 'add'].includes(review.action)) {
+    throw new Error('AI returned an incomplete review for ' + sectionTitle + '.');
+  }
+  const suggestedText = typeof review.text === 'string' ? review.text.trim() : '';
+  if (['modify', 'add'].includes(review.action) && !suggestedText) {
+    throw new Error('AI returned empty text for a ' + review.action + ' recommendation in ' + sectionTitle + '.');
+  }
+  if (review.action === 'modify' && suggestedText.toLowerCase() === sourceText.toLowerCase()) {
+    review.action = 'keep';
+  }
+  if (review.action === 'add' && sourceText) {
+    throw new Error('AI tried to add to a non-empty text section instead of making one decision for ' + sectionTitle + '.');
+  }
+  return {
+    sectionKey,
+    sectionTitle,
+    action: review.action,
+    original: sourceText,
+    text: ['modify', 'add'].includes(review.action) ? suggestedText : '',
+    reason: String(review.reason || '').slice(0, 260)
+  };
+};
+
 const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) => {
   try {
     return await optimizeArrayDataOnce(items, jd, sectionName, candidateContext);

@@ -17,38 +17,61 @@ const makeResponse = () => {
   };
 };
 
-const readMappedEntries = (prompt) => {
+const extractEntries = (prompt) => {
   const marker = 'CANDIDATE RESUME FACTS FOR THIS SECTION:\n';
   const start = prompt.indexOf(marker);
   const end = prompt.indexOf('\n\nReview all entries', start);
-  if (start < 0 || end < 0) throw new Error('Review prompt did not include the source entries.');
+  if (start < 0 || end < 0) throw new Error('Bullet-review prompt is missing mapped entries.');
   return JSON.parse(prompt.slice(start + marker.length, end));
 };
 
-const validSectionResponse = (prompt) => {
-  const mapped = readMappedEntries(prompt);
-  return JSON.stringify({
-    entries: mapped.map((entry) => ({
-      _index: entry._index,
-      bullets: entry.bullets.map((text, bulletIndex) => ({
-        bulletIndex, action: 'keep', text, reason: 'Already relevant and clear.'
-      })),
-      additions: []
-    }))
-  });
+const validBulletResponse = (prompt) => JSON.stringify({
+  entries: extractEntries(prompt).map((entry) => ({
+    _index: entry._index,
+    bullets: entry.bullets.map((text, bulletIndex) => ({
+      bulletIndex, action: 'keep', text, reason: 'Already clear and relevant.'
+    })),
+    additions: []
+  }))
+});
+
+const validTextResponse = (action = 'keep', text = '') => JSON.stringify({
+  review: {
+    action,
+    text,
+    reason: action === 'keep'
+      ? 'The section is already clear and relevant to the target role.'
+      : 'This improves alignment with the target job using existing resume facts.'
+  }
+});
+
+const extractSkillCategories = (prompt) => {
+  const marker = 'EXISTING SKILLS (source of truth):\n';
+  const start = prompt.indexOf(marker) + marker.length;
+  const end = prompt.indexOf('\n\nINCLUDED RESUME EVIDENCE', start);
+  if (start < marker.length || end < 0) throw new Error('Skills-review prompt is missing the source skills.');
+  return JSON.parse(prompt.slice(start, end));
+};
+
+const validSkillsResponse = (prompt) => {
+  const categories = extractSkillCategories(prompt);
+  const skills = categories.flatMap((category) => category.items.map((item) => ({
+    categoryIndex: category.categoryIndex,
+    skillIndex: item.skillIndex,
+    action: 'keep',
+    text: item.name,
+    reason: 'Relevant or transferable skill.'
+  })));
+  return JSON.stringify({ skills, additions: [] });
 };
 
 const withAxiosMock = async (handler, run) => {
   const originalPost = axios.post;
   axios.post = handler;
-  try {
-    await run();
-  } finally {
-    axios.post = originalPost;
-  }
+  try { await run(); } finally { axios.post = originalPost; }
 };
 
-const invoke = async (resumeData, handler, jobDescription = 'A sufficiently detailed target job description') => {
+const runReview = async (resumeData, handler, jobDescription = 'A sufficiently detailed target job description') => {
   const response = makeResponse();
   await withAxiosMock(handler, async () => {
     await magicTailor({ body: { jobDescription, resumeData } }, response.res);
@@ -56,256 +79,265 @@ const invoke = async (resumeData, handler, jobDescription = 'A sufficiently deta
   return response.read();
 };
 
-test('rejects missing or blank job descriptions without calling Groq', async () => {
+const mockBySchema = async (_url, body) => {
+  const prompt = body.messages[1].content;
+  const schemaName = body.response_format?.json_schema?.name;
+  if (schemaName === 'resume_bullet_review') {
+    return { data: { choices: [{ message: { content: validBulletResponse(prompt) } }] } };
+  }
+  if (schemaName === 'resume_text_section_review') {
+    return { data: { choices: [{ message: { content: validTextResponse() } }] } };
+  }
+  if (schemaName === 'resume_skills_review') {
+    return { data: { choices: [{ message: { content: validSkillsResponse(prompt) } }] } };
+  }
+  throw new Error('Unexpected review schema: ' + schemaName);
+};
+
+test('rejects a missing job description before calling Groq', async () => {
   let calls = 0;
   const response = makeResponse();
-  await withAxiosMock(async () => { calls += 1; throw new Error('should not call AI'); }, async () => {
-    await magicTailor({ body: { jobDescription: '  ', resumeData: {} } }, response.res);
+  await withAxiosMock(async () => { calls += 1; throw new Error('must not call AI'); }, async () => {
+    await magicTailor({ body: { jobDescription: ' ', resumeData: {} } }, response.res);
   });
   assert.equal(response.read().statusCode, 400);
   assert.equal(calls, 0);
 });
 
-test('reviews experience, projects, and explicitly supported custom bullet sections only', async () => {
-  const prompts = [];
-  const { statusCode, payload } = await invoke({
-    summary: 'Existing summary',
-    experience: [{ company: 'Acme', description: ['Built an API'] }],
-    projects: [{ title: 'Portfolio', bulletPoints: ['Created a portfolio'] }],
-    education: [{ institution: 'University', description: 'Degree details' }],
-    certifications: [{ name: 'Cloud cert', text: 'Certification details' }],
-    customText: [{ title: 'About', text: 'This is prose, not a bullet list' }],
-    customList: [{ title: 'Volunteering', description: ['Helped organize events'] }],
-    customBullets: ['Mentored two students'],
-    skills: [{ category: 'Tools', items: [{ name: 'Git' }] }],
+test('reviews summary, experience, projects, skills, and every custom section type', async () => {
+  const schemaCalls = [];
+  const { statusCode, payload } = await runReview({
+    summary: 'Backend developer building REST services.',
+    experience: [{ company: 'Acme', description: ['Built a Node.js API'] }],
+    projects: [{ name: 'Social platform', description: ['Built feeds and profiles'] }],
+    skills: [{ category: 'Backend', items: [{ name: 'Node.js' }, { name: 'MongoDB' }] }],
+    education: [{ institution: 'University', degree: 'B.Tech' }],
+    certifications: [{ name: 'Cloud certification' }],
+    customText: 'Won a department-level technical award.',
+    customList: [{ title: 'Volunteering', bulletPoints: ['Organized a coding workshop'] }],
+    customBullets: [{ date: '2025', text: 'Mentored two students' }],
     sections: [
-      { key: 'customText', title: 'About', isCustom: true, type: 'text' },
+      { key: 'summary', title: 'Summary' },
+      { key: 'customText', title: 'Awards', isCustom: true, type: 'text' },
       { key: 'customList', title: 'Volunteering', isCustom: true, type: 'list' },
       { key: 'customBullets', title: 'Highlights', isCustom: true, type: 'bullets' }
     ]
   }, async (_url, body) => {
-    const prompt = body.messages[1].content;
-    prompts.push(prompt);
-    return { data: { choices: [{ message: { content: validSectionResponse(prompt) } }] } };
+    const name = body.response_format?.json_schema?.name;
+    schemaCalls.push(name);
+    return mockBySchema(_url, body);
   });
+
   assert.equal(statusCode, 200);
-  assert.equal(prompts.length, 4);
+  assert.equal(schemaCalls.filter((name) => name === 'resume_bullet_review').length, 4);
+  assert.equal(schemaCalls.filter((name) => name === 'resume_text_section_review').length, 2);
+  assert.equal(schemaCalls.filter((name) => name === 'resume_skills_review').length, 1);
+  assert.deepEqual(payload.sectionReviews.map((item) => item.sectionKey).sort(), ['customText', 'summary']);
   assert.equal(payload.bulletActions.length, 4);
-  assert.deepEqual(payload.bulletActions.map((entry) => entry.sectionKey).sort(), ['customBullets', 'customList', 'experience', 'projects']);
+  assert.equal(payload.skillActions.length, 2);
   assert.equal(payload.reviewedBulletCount, 4);
-  assert.equal(Object.hasOwn(payload, 'summaryOptions'), false);
-  assert.equal(Object.hasOwn(payload, 'warnings'), false);
-  assert.ok(prompts.every((prompt) => !prompt.includes('VERIFIED RESUME FACTS')));
+  assert.equal(payload.reviewedSkillCount, 2);
+  assert.equal(payload.reviewedTextSectionCount, 2);
+  assert.equal(payload.reviewedPointCount, 8);
+  assert.ok(!schemaCalls.includes('education'));
+  assert.ok(!schemaCalls.includes('certifications'));
 });
 
-test('returns exactly one KEEP, MODIFY, or REMOVE decision for every source point, with ADD separate', async () => {
-  const result = await invoke({
-    experience: [{
-      company: 'Acme',
-      description: ['Built API endpoints', 'Designed database schema', 'Maintained an unrelated circuit']
-    }]
-  }, async (_url, body) => {
-    const mapped = readMappedEntries(body.messages[1].content);
-    return {
-      data: {
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              entries: mapped.map((entry) => ({
-                _index: entry._index,
-                bullets: [
-                  { bulletIndex: 0, action: 'keep', text: entry.bullets[0], reason: 'Strong evidence.' },
-                  { bulletIndex: 1, action: 'modify', text: 'Designed MongoDB schemas for the API service.', reason: 'Clearer relevance.' },
-                  { bulletIndex: 2, action: 'remove', text: '', reason: 'Not relevant to this role.' }
-                ],
-                additions: [{ text: 'Implemented API authentication using JWT.', reason: 'Supported by this same project.' }]
-              }))
-            })
-          }
-        }]
-      }
-    };
-  });
-  assert.equal(result.statusCode, 200);
-  assert.deepEqual(result.payload.bulletActions[0].bullets.map((bullet) => bullet.action), ['keep', 'modify', 'remove']);
-  assert.equal(result.payload.bulletActions[0].bullets.length, 3);
-  assert.equal(result.payload.bulletActions[0].additions.length, 1);
-  assert.equal(result.payload.reviewedBulletCount, 3);
-  assert.equal(result.payload.changedBulletCount, 3);
+test('marks a strong existing summary KEEP and provides a reason without a rewrite', async () => {
+  const { statusCode, payload } = await runReview({
+    summary: 'Backend engineer experienced in Node.js APIs and MongoDB.',
+    experience: [],
+    projects: [],
+    skills: []
+  }, mockBySchema);
+  assert.equal(statusCode, 200);
+  assert.equal(payload.sectionReviews.length, 1);
+  assert.equal(payload.sectionReviews[0].action, 'keep');
+  assert.equal(payload.sectionReviews[0].text, '');
+  assert.match(payload.sectionReviews[0].reason, /clear and relevant/i);
 });
 
-test('retries an incomplete bullet plan once, then accepts a complete review', async () => {
-  let calls = 0;
-  const result = await invoke({
-    experience: [{ company: 'Acme', description: ['First point', 'Second point'] }]
+test('returns a MODIFY recommendation for a summary that can be improved', async () => {
+  const improved = 'Backend engineer who builds Node.js REST APIs and MongoDB-backed services.';
+  const { statusCode, payload } = await runReview({
+    summary: 'I am hardworking and looking for a challenging job.',
+    experience: [{ company: 'Acme', description: ['Built a Node.js REST API'] }],
+    skills: []
   }, async (_url, body) => {
-    calls += 1;
-    if (calls === 1) {
+    if (body.response_format.json_schema.name === 'resume_text_section_review') {
+      return { data: { choices: [{ message: { content: validTextResponse('modify', improved) } }] } };
+    }
+    return mockBySchema(_url, body);
+  }, 'Node.js backend engineer');
+  assert.equal(statusCode, 200);
+  assert.equal(payload.sectionReviews[0].action, 'modify');
+  assert.equal(payload.sectionReviews[0].text, improved);
+});
+
+test('creates a summary ADD suggestion only from supported resume facts when summary is empty', async () => {
+  const draft = 'Backend developer with project experience building Node.js APIs and MongoDB services.';
+  const { statusCode, payload } = await runReview({
+    summary: '',
+    experience: [{ company: 'Acme', description: ['Built Node.js REST APIs using MongoDB'] }],
+    skills: []
+  }, async (_url, body) => {
+    if (body.response_format.json_schema.name === 'resume_text_section_review') {
+      assert.match(body.messages[1].content, /Built Node\.js REST APIs using MongoDB/);
+      return { data: { choices: [{ message: { content: validTextResponse('add', draft) } }] } };
+    }
+    return mockBySchema(_url, body);
+  }, 'Node.js backend developer');
+  assert.equal(statusCode, 200);
+  assert.equal(payload.sectionReviews[0].action, 'add');
+  assert.equal(payload.sectionReviews[0].original, '');
+  assert.equal(payload.sectionReviews[0].text, draft);
+});
+
+test('reviews every skill individually and keeps evidence-backed skill additions separate', async () => {
+  const { statusCode, payload } = await runReview({
+    summary: '',
+    skills: [{ category: 'Languages', items: [{ name: 'Python' }, { name: 'Verilog' }] }],
+    experience: [{ company: 'Acme', description: ['Built Python automation scripts'] }]
+  }, async (_url, body) => {
+    if (body.response_format.json_schema.name === 'resume_skills_review') {
+      const categories = extractSkillCategories(body.messages[1].content);
       return {
-        data: {
-          choices: [{
-            message: {
-              content: JSON.stringify({
-                entries: [{ _index: 0, bullets: [{ bulletIndex: 0, action: 'keep', text: 'First point', reason: 'Good.' }], additions: [] }]
-              })
-            }
-          }]
-        }
+        data: { choices: [{ message: { content: JSON.stringify({
+          skills: [
+            { categoryIndex: 0, skillIndex: 0, action: 'keep', text: 'Python', reason: 'Used in project evidence.' },
+            { categoryIndex: 0, skillIndex: 1, action: 'remove', text: 'Verilog', reason: 'Not relevant to this target job.' }
+          ],
+          additions: [{ category: 'Languages', name: 'Python scripting', reason: 'Directly evidenced in work/project content.' }]
+        }) } }] }
       };
     }
-    assert.match(body.messages[1].content, /previous response failed validation/i);
-    return { data: { choices: [{ message: { content: validSectionResponse(body.messages[1].content) } }] } };
-  });
-  assert.equal(result.statusCode, 200);
-  assert.equal(calls, 2);
-  assert.equal(result.payload.reviewedBulletCount, 2);
-});
-
-test('fails the whole review instead of returning partial sections when one section fails twice', async () => {
-  let calls = 0;
-  const result = await invoke({
-    experience: [{ company: 'Broken', description: ['This section fails'] }],
-    projects: [{ title: 'Good project', description: ['This section would pass'] }]
-  }, async (_url, body) => {
-    calls += 1;
-    const prompt = body.messages[1].content;
-    if (prompt.includes('"title":"Broken"')) {
-      return { data: { choices: [{ message: { content: 'not json' } }] } };
+    if (body.response_format.json_schema.name === 'resume_text_section_review') {
+      return { data: { choices: [{ message: { content: validTextResponse('remove', '') } }] } };
     }
-    return { data: { choices: [{ message: { content: validSectionResponse(prompt) } }] } };
-  });
-  assert.equal(result.statusCode, 500);
-  assert.equal(calls, 3);
-  assert.equal(result.payload.success, false);
-  assert.match(result.payload.error, /Resume review could not be completed/);
-  assert.equal(Object.hasOwn(result.payload, 'bulletActions'), false);
+    return mockBySchema(_url, body);
+  }, 'Python backend engineer');
+
+  assert.equal(statusCode, 200);
+  assert.deepEqual(payload.skillActions.map((item) => item.action), ['keep', 'remove']);
+  assert.equal(payload.skillAdditions.length, 1);
+  assert.equal(payload.skillAdditions[0].name, 'Python scripting');
 });
 
-test('uses strict GPT-OSS JSON schema and supported token parameter', async () => {
-  let sentBody;
-  const result = await invoke({
-    experience: [{ company: 'Acme', description: ['Built API endpoints'] }]
+test('reviews custom text sections with their own KEEP or MODIFY decision', async () => {
+  const { statusCode, payload } = await runReview({
+    summary: 'Engineer experienced in backend systems.',
+    experience: [],
+    skills: [],
+    customAbout: 'Experienced with software tools.',
+    sections: [{ key: 'customAbout', title: 'About Me', isCustom: true, type: 'text' }]
   }, async (_url, body) => {
-    sentBody = body;
-    return { data: { choices: [{ message: { content: validSectionResponse(body.messages[1].content) } }] } };
+    if (body.response_format.json_schema.name === 'resume_text_section_review') {
+      const isCustom = body.messages[1].content.includes('SECTION TO REVIEW: About Me');
+      return { data: { choices: [{ message: { content: validTextResponse(
+        isCustom ? 'modify' : 'keep',
+        isCustom ? 'Software engineer focused on backend systems and API development.' : ''
+      ) } }] } };
+    }
+    return mockBySchema(_url, body);
   });
-  assert.equal(result.statusCode, 200);
-  assert.equal(sentBody.temperature, 0.25);
-  assert.equal(sentBody.response_format.type, 'json_schema');
-  assert.equal(sentBody.response_format.json_schema.strict, true);
-  assert.equal(sentBody.response_format.json_schema.name, 'resume_bullet_review');
-  assert.equal(sentBody.reasoning_format, 'hidden');
-  assert.equal(sentBody.max_completion_tokens, 4200);
-  assert.equal(Object.hasOwn(sentBody, 'max_tokens'), false);
+  assert.equal(statusCode, 200);
+  const custom = payload.sectionReviews.find((item) => item.sectionKey === 'customAbout');
+  assert.equal(custom.action, 'modify');
+  assert.match(custom.text, /backend systems/);
 });
 
-test('falls back from GPT-OSS 120B to GPT-OSS 20B through Groq only', async () => {
-  const requests = [];
-  const result = await invoke({
-    experience: [{ company: 'Acme', description: ['Built an API'] }]
-  }, async (url, body, config) => {
-    requests.push({ url, model: body.model, authorization: config.headers.Authorization });
-    if (body.model === 'openai/gpt-oss-120b') {
-      const error = new Error('Model not found');
-      error.response = { status: 404 };
+test('does not send education, certifications, or personal contact details into review prompts', async () => {
+  const prompts = [];
+  const { statusCode } = await runReview({
+    summary: '',
+    experience: [],
+    skills: [],
+    personalInfo: { name: 'Candidate', email: 'private@example.com' },
+    education: [{ institution: 'Example University', degree: 'B.Tech' }],
+    certifications: [{ name: 'Private Certification' }]
+  }, async (_url, body) => {
+    prompts.push(body.messages[1].content);
+    return mockBySchema(_url, body);
+  });
+  assert.equal(statusCode, 200);
+  assert.equal(prompts.length, 1);
+  assert.ok(prompts.every((prompt) => !prompt.includes('Example University')));
+  assert.ok(prompts.every((prompt) => !prompt.includes('Private Certification')));
+  assert.ok(prompts.every((prompt) => !prompt.includes('private@example.com')));
+});
+
+test('fails the entire analysis instead of returning a partial review when one section fails', async () => {
+  const { statusCode, payload } = await runReview({
+    summary: 'Backend developer.',
+    experience: [{ company: 'Acme', description: ['Built an API'] }],
+    projects: [{ name: 'Project', description: ['Built a dashboard'] }],
+    skills: []
+  }, async (_url, body) => {
+    if (body.response_format.json_schema.name === 'resume_bullet_review' &&
+        body.messages[1].content.includes('"company":"Acme"')) {
+      const error = new Error('Invalid request');
+      error.response = { status: 400, data: { error: { message: 'Invalid request for test' } } };
       throw error;
     }
-    return { data: { choices: [{ message: { content: validSectionResponse(body.messages[1].content) } }] } };
+    return mockBySchema(_url, body);
   });
-  assert.equal(result.statusCode, 200);
-  assert.equal(result.payload.reviewedBulletCount, 1);
-  assert.deepEqual(requests.map((request) => request.model), ['openai/gpt-oss-120b', 'openai/gpt-oss-20b']);
-  assert.ok(requests.every((request) => request.url === 'https://api.groq.com/openai/v1/chat/completions'));
-  assert.ok(requests.every((request) => request.authorization === 'Bearer test-only-key'));
+  assert.equal(statusCode, 500);
+  assert.match(payload.error, /full resume review could not be completed/i);
+  assert.equal(Object.hasOwn(payload, 'bulletActions'), false);
 });
 
-test('does not waste backup-model quota on invalid Groq credentials', async () => {
-  let calls = 0;
-  const result = await invoke({
-    experience: [{ company: 'Acme', description: ['Built an API'] }]
-  }, async () => {
-    calls += 1;
-    const error = new Error('Unauthorized');
-    error.response = { status: 401, data: { error: { message: 'Invalid API key' } } };
-    throw error;
+test('does not call Groq for an empty skills section', async () => {
+  let skillCalls = 0;
+  const { statusCode } = await runReview({ summary: '', skills: [], experience: [] }, async (_url, body) => {
+    if (body.response_format.json_schema.name === 'resume_skills_review') skillCalls += 1;
+    return mockBySchema(_url, body);
   });
-  assert.equal(result.statusCode, 500);
-  assert.match(result.payload.error, /HTTP 401: Invalid API key/);
-  assert.equal(calls, 1);
+  assert.equal(statusCode, 200);
+  assert.equal(skillCalls, 0);
 });
 
-test('exposes Groq JSON validation errors and never returns a partial plan', async () => {
-  let calls = 0;
-  const result = await invoke({
-    experience: [{ company: 'Acme', description: ['Built an API'] }]
-  }, async () => {
-    calls += 1;
-    const error = new Error('Request failed with status code 400');
-    error.response = { status: 400, data: { error: { message: 'Failed to validate JSON. Please adjust your prompt.' } } };
-    throw error;
-  });
-  assert.equal(result.statusCode, 500);
-  assert.match(result.payload.error, /HTTP 400: Failed to validate JSON/i);
-  assert.equal(Object.hasOwn(result.payload, 'bulletActions'), false);
-  assert.equal(calls, 1);
-});
-
-test('does not call the model when there are no bullet-bearing sections', async () => {
-  let calls = 0;
-  const result = await invoke({ summary: 'Only a summary', skills: ['Python'], education: [] }, async () => {
-    calls += 1;
-    throw new Error('AI should not be called');
-  });
-  assert.equal(result.statusCode, 200);
-  assert.equal(calls, 0);
-  assert.deepEqual(result.payload.bulletActions, []);
-  assert.equal(result.payload.reviewedBulletCount, 0);
-});
-
-test('keeps transferable experience and does not recommend removal due only to technology mismatch', async () => {
-  let systemPrompt = '';
-  const result = await invoke({
-    experience: [{ company: 'DRDO', description: ['Designed Verilog logic modules'] }]
+test('rejects incomplete decisions for skills rather than silently omitting a skill', async () => {
+  const { statusCode, payload } = await runReview({
+    summary: '',
+    skills: [{ category: 'Backend', items: [{ name: 'Node.js' }, { name: 'MongoDB' }] }]
   }, async (_url, body) => {
-    systemPrompt = body.messages[0].content;
-    return { data: { choices: [{ message: { content: validSectionResponse(body.messages[1].content) } }] } };
-  }, 'Python backend engineer');
-  assert.equal(result.statusCode, 200);
-  assert.match(systemPrompt, /Do not remove merely because its technology differs/i);
-});
-
-test('caps additions and keeps their ownership tied to the exact employer or project entry', async () => {
-  let systemPrompt = '';
-  const result = await invoke({
-    experience: [{ company: 'Acme', description: ['First', 'Second'] }],
-    projects: [{ title: 'Personal project', description: ['A separate portfolio app'] }]
-  }, async (_url, body) => {
-    systemPrompt = body.messages[0].content;
-    const mapped = readMappedEntries(body.messages[1].content);
-    return {
-      data: {
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              entries: mapped.map((entry) => ({
-                _index: entry._index,
-                bullets: entry.bullets.map((text, bulletIndex) => ({
-                  bulletIndex, action: 'keep', text, reason: 'Relevant.'
-                })),
-                additions: [
-                  { text: 'Verified achievement A', reason: 'Supported by this exact entry.' },
-                  { text: 'Verified achievement B', reason: 'Supported by this exact entry.' },
-                  { text: 'Verified achievement C', reason: 'Supported by this exact entry.' }
-                ]
-              }))
-            })
-          }
-        }]
-      }
+    if (body.response_format.json_schema.name === 'resume_skills_review') {
+      return { data: { choices: [{ message: { content: JSON.stringify({
+        skills: [{ categoryIndex: 0, skillIndex: 0, action: 'keep', text: 'Node.js', reason: 'Relevant.' }],
+        additions: []
+      }) } }] }
     };
+    return mockBySchema(_url, body);
   });
-  assert.equal(result.statusCode, 200);
-  assert.equal(result.payload.bulletActions[0].additions.length, 2);
-  assert.match(systemPrompt, /must belong to THIS exact employer, project, or activity entry/i);
-  assert.match(systemPrompt, /Do not exceed 4 bullets per entry/i);
+  assert.equal(statusCode, 500);
+  assert.match(payload.error, /missing, duplicate, or invalid skill decisions/i);
+});
+
+test('includes every plain-string custom bullet in the review', async () => {
+  const { statusCode, payload } = await runReview({
+    summary: '',
+    skills: [],
+    customHighlights: ['Built an internal CLI tool'],
+    sections: [{ key: 'customHighlights', title: 'Highlights', isCustom: true, type: 'bullets' }]
+  }, mockBySchema);
+  assert.equal(statusCode, 200);
+  assert.equal(payload.bulletActions.length, 1);
+  assert.equal(payload.bulletActions[0].bullets[0].original, 'Built an internal CLI tool');
+});
+
+test('uses strict JSON schema output for all review types', async () => {
+  const seen = [];
+  const { statusCode } = await runReview({
+    summary: 'Backend engineer.',
+    experience: [{ company: 'Acme', description: ['Built an API'] }],
+    skills: [{ category: 'Backend', items: [{ name: 'Node.js' }] }]
+  }, async (_url, body) => {
+    seen.push(body.response_format?.json_schema);
+    return mockBySchema(_url, body);
+  });
+  assert.equal(statusCode, 200);
+  assert.ok(seen.every((schema) => schema && schema.strict === true));
+  assert.deepEqual(seen.map((schema) => schema.name).sort(), [
+    'resume_bullet_review', 'resume_skills_review', 'resume_text_section_review'
+  ].sort());
 });

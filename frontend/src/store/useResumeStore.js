@@ -381,33 +381,40 @@ export const useResumeStore = create((set, get) => ({
         throw new Error(data?.error || 'The AI returned an invalid tailoring response.');
       }
 
-      const summaryOptions = (Array.isArray(data.summaryOptions) ? data.summaryOptions : [])
-        .filter((option) => typeof option === 'string' && option.trim() && option.trim() !== (activeResume.resumeData.summary || '').trim());
-      const tailoredItems = (Array.isArray(data.bulletActions) ? data.bulletActions : [])
-        .map((entry) => ({
+      if (!Array.isArray(data.bulletActions)) {
+        throw new Error('The AI response did not include a complete bullet review.');
+      }
+
+      const tailoredItems = data.bulletActions.map((entry) => {
+        if (!entry || !Array.isArray(entry.bullets) || !Number.isInteger(entry.itemIndex)) {
+          throw new Error('The AI returned an incomplete section review. Run the Copilot again.');
+        }
+        if (entry.bullets.some((bullet) => !['keep', 'modify', 'remove'].includes(bullet?.action))) {
+          throw new Error('The AI returned an unsupported action for a resume point. Run the Copilot again.');
+        }
+        return {
           sectionKey: entry.sectionTitle || entry.sectionKey,
           targetSectionKey: entry.sectionKey,
           itemTitle: entry.itemTitle || 'Resume entry',
           itemIndex: entry.itemIndex,
-          bullets: Array.isArray(entry.bullets) ? entry.bullets.filter((bullet) => bullet.action !== 'keep') : [],
-          keptBullets: Array.isArray(entry.bullets) ? entry.bullets.filter((bullet) => bullet.action === 'keep') : [],
+          bullets: entry.bullets,
           additions: Array.isArray(entry.additions) ? entry.additions : []
-        }))
-        .filter((entry) => entry.bullets.length || entry.additions.length || entry.keptBullets.length);
+        };
+      }).filter((entry) => entry.bullets.length || entry.additions.length);
 
-      const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+      const reviewedBulletCount = tailoredItems.reduce((total, item) => total + item.bullets.length, 0);
+      if (reviewedBulletCount !== Number(data.reviewedBulletCount || 0)) {
+        throw new Error('The AI review was incomplete: not every existing point received a decision.');
+      }
       const changedBulletCount = tailoredItems.reduce((total, item) =>
-        total + item.bullets.length + item.additions.length, 0);
+        total + item.bullets.filter((bullet) => bullet.action !== 'keep').length + item.additions.length, 0);
 
       set({
         generatedBullets: {
           success: true,
-          summaryOptions,
-          sourceSummary: activeResume.resumeData.summary || '',
           tailoredItems,
-          warnings,
           changedBulletCount,
-          reviewedBulletCount: data.reviewedBulletCount || 0,
+          reviewedBulletCount,
           atsScore: null
         }
       });
@@ -539,14 +546,31 @@ export const useResumeStore = create((set, get) => ({
     const { activeResume, updateResumeData } = get();
     if (!activeResume?.resumeData || !sectionKey || !Number.isInteger(itemIndex) || !Number.isInteger(bulletIndex) || !String(replacement || '').trim()) return false;
     const currentItems = activeResume.resumeData[sectionKey];
-    const targetItem = Array.isArray(currentItems) ? currentItems[itemIndex] : null;
-    if (!targetItem) return false;
+    if (!Array.isArray(currentItems) || !currentItems[itemIndex]) return false;
+    const section = (activeResume.resumeData.sections || []).find((entry) => entry.key === sectionKey);
+    const expected = String(expectedOriginal || '').trim();
+
+    if (section?.type === 'bullets') {
+      const point = currentItems[itemIndex];
+      const currentText = typeof point === 'string' ? point.trim() : String(point?.text ?? point?.description ?? point?.content ?? '').trim();
+      if (currentText !== expected) return false;
+      const updatedItems = [...currentItems];
+      if (point && typeof point === 'object' && !Array.isArray(point)) {
+        const textField = ['text', 'description', 'content'].find((key) => typeof point[key] === 'string') || 'text';
+        updatedItems[itemIndex] = { ...point, [textField]: replacement.trim() };
+      } else {
+        updatedItems[itemIndex] = replacement.trim();
+      }
+      updateResumeData({ ...activeResume.resumeData, [sectionKey]: updatedItems });
+      return true;
+    }
+
+    const targetItem = currentItems[itemIndex];
     const field = targetItem.description !== undefined ? 'description' : (targetItem.bulletPoints !== undefined ? 'bulletPoints' : 'text');
     const currentValue = targetItem[field];
     const isArray = Array.isArray(currentValue);
     const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\n');
     const readText = (bullet) => typeof bullet === 'string' ? bullet.trim() : String(bullet?.text ?? bullet?.description ?? bullet?.content ?? bullet?.name ?? '').trim();
-    const expected = String(expectedOriginal || '').trim();
     let targetIndex = bulletIndex;
     if (readText(bulletList[targetIndex]) !== expected) {
       const matches = bulletList.map((bullet, index) => readText(bullet) === expected ? index : -1).filter((index) => index >= 0);
@@ -575,7 +599,7 @@ export const useResumeStore = create((set, get) => ({
     const section = (activeResume.resumeData.sections || []).find((entry) => entry.key === sectionKey);
     if (section?.type === 'bullets') {
       const point = currentItems[itemIndex];
-      const currentText = typeof point === 'string' ? point : String(point?.text || '');
+      const currentText = typeof point === 'string' ? point : String(point?.text ?? point?.description ?? point?.content ?? '');
       if (currentText.trim() !== String(expectedOriginal || '').trim()) return false;
       const updatedItems = [...currentItems];
       updatedItems.splice(itemIndex, 1);
@@ -612,7 +636,7 @@ export const useResumeStore = create((set, get) => ({
 
     if (section?.type === 'bullets') {
       const exists = currentItems.some((point) => {
-        const value = typeof point === 'string' ? point : point?.text;
+        const value = typeof point === 'string' ? point : (point?.text ?? point?.description ?? point?.content);
         return String(value || '').trim().toLowerCase() === text.trim().toLowerCase();
       });
       if (exists) return false;
@@ -627,7 +651,8 @@ export const useResumeStore = create((set, get) => ({
     const currentValue = targetItem[field];
     const isArray = Array.isArray(currentValue);
     const bulletList = isArray ? [...currentValue] : String(currentValue || '').split('\n').filter(Boolean);
-    if (bulletList.some((bullet) => String(bullet || '').trim().toLowerCase() === text.trim().toLowerCase())) return false;
+    const readText = (bullet) => typeof bullet === 'string' ? bullet.trim() : String(bullet?.text ?? bullet?.description ?? bullet?.content ?? bullet?.name ?? '').trim();
+    if (bulletList.some((bullet) => readText(bullet).toLowerCase() === text.trim().toLowerCase())) return false;
     bulletList.push(text.trim());
     const updatedItems = [...currentItems];
     updatedItems[itemIndex] = { ...targetItem, [field]: isArray ? bulletList : bulletList.join('\n') };

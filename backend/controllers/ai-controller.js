@@ -180,6 +180,60 @@ const BULLET_REVIEW_RESPONSE_SCHEMA = {
   additionalProperties: false
 };
 
+const TEXT_SECTION_REVIEW_SCHEMA = {
+  type: 'object',
+  properties: {
+    review: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['keep', 'modify', 'remove', 'add'] },
+        text: { type: 'string' },
+        reason: { type: 'string' }
+      },
+      required: ['action', 'text', 'reason'],
+      additionalProperties: false
+    }
+  },
+  required: ['review'],
+  additionalProperties: false
+};
+
+const SKILLS_REVIEW_SCHEMA = {
+  type: 'object',
+  properties: {
+    skills: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          categoryIndex: { type: 'integer', minimum: 0 },
+          skillIndex: { type: 'integer', minimum: 0 },
+          action: { type: 'string', enum: ['keep', 'modify', 'remove'] },
+          text: { type: 'string' },
+          reason: { type: 'string' }
+        },
+        required: ['categoryIndex', 'skillIndex', 'action', 'text', 'reason'],
+        additionalProperties: false
+      }
+    },
+    additions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          category: { type: 'string' },
+          name: { type: 'string' },
+          reason: { type: 'string' }
+        },
+        required: ['category', 'name', 'reason'],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ['skills', 'additions'],
+  additionalProperties: false
+};
+
 const optimizeArrayDataOnce = async (items, jd, sectionName, candidateContext = {}, retryFeedback = '') => {
   if (!Array.isArray(items) || !items.length) return { items: items || [], actions: [], changedCount: 0, reviewedCount: 0 };
 
@@ -291,6 +345,154 @@ const optimizeArrayDataOnce = async (items, jd, sectionName, candidateContext = 
   return { items, actions, changedCount, reviewedCount };
 };
 
+
+const reviewTextSection = async ({ sectionKey, sectionTitle, original, jd, candidateContext }) => {
+  const sourceText = String(original || '').trim();
+  const systemInstruction = [
+    'You are a meticulous resume reviewer. Review one complete resume text section for fit to the exact target job description.',
+    'Return one decision: KEEP if the text is already clear, relevant, and strong; MODIFY if it can be materially improved without changing facts; REMOVE only if it is misleading, redundant, or genuinely unhelpful; ADD when the section is blank and a useful version can be written from verified resume evidence.',
+    'For an existing good summary, explicitly choose KEEP and explain briefly why no change is needed.',
+    'Never invent skills, tools, metrics, years, seniority, employers, achievements, outcomes, or responsibilities.',
+    'Use experience, projects, skills, and other included resume content only as evidence. Education and certifications are excluded from this review.',
+    'For an empty section, write a draft only when the supplied resume evidence supports it. If evidence is insufficient, use REMOVE with an explanation and empty text.',
+    'Keep a modified section concise and specific to the target job. Do not keyword-stuff.',
+    'Return strict JSON matching the required schema.'
+  ].join('\n');
+  const prompt = 'TARGET JOB DESCRIPTION:\n' + jd +
+    '\n\nSECTION TO REVIEW: ' + sectionTitle +
+    '\nCURRENT CONTENT:\n' + (sourceText || '[EMPTY]') +
+    '\n\nOTHER INCLUDED RESUME EVIDENCE (for fact-checking only):\n' + JSON.stringify(candidateContext) +
+    '\n\nChoose exactly one action for this section. The section is not changed automatically.';
+  const raw = await callAIEngineWithRetry(prompt, systemInstruction, {
+    maxTokens: 1300,
+    temperature: 0.2,
+    jsonSchema: TEXT_SECTION_REVIEW_SCHEMA,
+    schemaName: 'resume_text_section_review'
+  });
+  const parsed = extractCleanJSON(raw);
+  const review = parsed.review;
+  if (!review || !['keep', 'modify', 'remove', 'add'].includes(review.action)) {
+    throw new Error('AI returned an incomplete review for ' + sectionTitle + '.');
+  }
+  const suggestedText = typeof review.text === 'string' ? review.text.trim() : '';
+  if (['modify', 'add'].includes(review.action) && !suggestedText) {
+    throw new Error('AI returned empty text for a ' + review.action + ' recommendation in ' + sectionTitle + '.');
+  }
+  if (review.action === 'modify' && suggestedText.toLowerCase() === sourceText.toLowerCase()) {
+    review.action = 'keep';
+  }
+  if (review.action === 'add' && sourceText) {
+    throw new Error('AI tried to add to a non-empty text section instead of making one decision for ' + sectionTitle + '.');
+  }
+  return {
+    sectionKey,
+    sectionTitle,
+    action: review.action,
+    original: sourceText,
+    text: ['modify', 'add'].includes(review.action) ? suggestedText : '',
+    reason: String(review.reason || '').slice(0, 260)
+  };
+};
+
+
+const normalizeSkillsForReview = (skills) => (Array.isArray(skills) ? skills : []).map((category, categoryIndex) => {
+  if (typeof category === 'string') {
+    return { categoryIndex, category: 'General', items: [{ name: category.trim(), skillIndex: 0 }] };
+  }
+  const items = Array.isArray(category?.items) ? category.items : [];
+  return {
+    categoryIndex,
+    category: category?.category || 'Skills',
+    items: items.map((item, skillIndex) => ({
+      skillIndex,
+      name: typeof item === 'string' ? item.trim() : String(item?.name || '').trim()
+    })).filter((item) => item.name)
+  };
+});
+
+const reviewSkills = async (skills, jd, candidateContext) => {
+  const categories = normalizeSkillsForReview(skills);
+  const sourceSkills = categories.flatMap((category) => category.items.map((item) => ({
+    categoryIndex: category.categoryIndex,
+    skillIndex: item.skillIndex,
+    category: category.category,
+    name: item.name
+  })));
+  if (!sourceSkills.length) return { actions: [], additions: [], reviewedCount: 0 };
+
+  const systemInstruction = [
+    'You are a careful technical recruiter reviewing a resume skills section against a target job description.',
+    'Return exactly one KEEP, MODIFY, or REMOVE decision for every supplied skill.',
+    'KEEP skills that are relevant or show useful transferable capability. A skill is not irrelevant merely because it is not named word-for-word in the job description.',
+    'REMOVE only skills that are genuinely unrelated, misleading, obsolete in context, or redundant.',
+    'MODIFY only to correct an obvious spelling, naming, or standardization issue. Do not turn one skill into a different technology.',
+    'Suggest ADDITIONS only for skills explicitly evidenced in the supplied summary, work experience, projects, or custom resume content. The job description alone is never evidence that the candidate has a skill.',
+    'Never invent proficiency, depth, or hands-on experience. Do not transfer a skill to an employer/project attribution.',
+    'Return each categoryIndex/skillIndex exactly once. Return concise reasons and strict JSON only.'
+  ].join('\n');
+  const prompt = 'TARGET JOB DESCRIPTION:\n' + jd +
+    '\n\nEXISTING SKILLS (source of truth):\n' + JSON.stringify(categories) +
+    '\n\nINCLUDED RESUME EVIDENCE FOR VERIFYING SKILL ADDITIONS:\n' + JSON.stringify(candidateContext);
+  const raw = await callAIEngineWithRetry(prompt, systemInstruction, {
+    maxTokens: 2200,
+    temperature: 0.2,
+    jsonSchema: SKILLS_REVIEW_SCHEMA,
+    schemaName: 'resume_skills_review'
+  });
+  const parsed = extractCleanJSON(raw);
+  if (!Array.isArray(parsed.skills) || !Array.isArray(parsed.additions)) {
+    throw new Error('AI returned an incomplete Skills section review.');
+  }
+
+  const returnedKeys = parsed.skills.map((item) => Number(item.categoryIndex) + ':' + Number(item.skillIndex));
+  const expectedKeys = sourceSkills.map((item) => item.categoryIndex + ':' + item.skillIndex);
+  if (
+    parsed.skills.length !== sourceSkills.length ||
+    returnedKeys.some((key) => !expectedKeys.includes(key)) ||
+    new Set(returnedKeys).size !== expectedKeys.length
+  ) {
+    throw new Error('AI returned missing, duplicate, or invalid skill decisions.');
+  }
+
+  const actions = parsed.skills.map((decision) => {
+    const source = sourceSkills.find((item) =>
+      item.categoryIndex === Number(decision.categoryIndex) && item.skillIndex === Number(decision.skillIndex)
+    );
+    if (!source || !['keep', 'modify', 'remove'].includes(decision.action)) {
+      throw new Error('AI returned an invalid action for skill ' + (source?.name || 'item') + '.');
+    }
+    const suggestedText = String(decision.text || '').trim();
+    if (decision.action === 'modify' && (!suggestedText || suggestedText.toLowerCase() === source.name.toLowerCase())) {
+      return { ...source, action: 'keep', original: source.name, text: source.name, reason: 'No meaningful correction was needed.' };
+    }
+    return {
+      ...source,
+      action: decision.action,
+      original: source.name,
+      text: decision.action === 'modify' ? suggestedText : source.name,
+      reason: String(decision.reason || '').slice(0, 220)
+    };
+  });
+
+  const seenAdditions = new Set();
+  const additions = parsed.additions
+    .filter((item) => typeof item?.name === 'string' && item.name.trim() && typeof item?.category === 'string' && item.category.trim())
+    .filter((item) => {
+      const key = item.name.trim().toLowerCase();
+      if (seenAdditions.has(key) || sourceSkills.some((skill) => skill.name.toLowerCase() === key)) return false;
+      seenAdditions.add(key);
+      return true;
+    })
+    .slice(0, 5)
+    .map((item) => ({
+      category: item.category.trim(),
+      name: item.name.trim(),
+      reason: String(item.reason || '').slice(0, 220)
+    }));
+
+  return { actions, additions, reviewedCount: actions.length };
+};
+
 const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) => {
   try {
     return await optimizeArrayDataOnce(items, jd, sectionName, candidateContext);
@@ -313,28 +515,37 @@ const magicTailor = async (req, res) => {
   if (!resumeData || typeof resumeData !== 'object' || Array.isArray(resumeData)) {
     return res.status(400).json({ success: false, error: "A valid resume is required before tailoring." });
   }
-
   try {
     const sectionTasks = [];
+    const textSectionTasks = [];
     const seenKeys = new Set();
-    const addSectionTask = (key, title, allowStringPoints = false) => {
+    const addBulletSectionTask = (key, title, allowStringPoints = false) => {
       if (!key || seenKeys.has(key) || !Array.isArray(resumeData[key])) return;
       const items = resumeData[key];
       const hasBulletContent = items.some((item) =>
         (allowStringPoints && typeof item === 'string' && item.trim()) ||
-        (item && typeof item === 'object' &&
-          (item.description !== undefined || item.bulletPoints !== undefined || item.text !== undefined))
+        (item && typeof item === 'object' && (item.description !== undefined || item.bulletPoints !== undefined || item.text !== undefined))
       );
       if (!hasBulletContent) return;
       seenKeys.add(key);
       sectionTasks.push({ key, title: title || key, items });
     };
 
-    addSectionTask('experience', 'Work Experience');
-    addSectionTask('projects', 'Projects');
-    (Array.isArray(resumeData.sections) ? resumeData.sections : []).forEach((section) => {
-      if (section?.isCustom && ['list', 'bullets'].includes(section.type)) {
-        addSectionTask(section.key, section.title, section.type === 'bullets');
+    // Tailor-able content only. Personal details, education, and certifications stay untouched.
+    textSectionTasks.push({ key: 'summary', title: 'Professional Summary', original: typeof resumeData.summary === 'string' ? resumeData.summary : '' });
+    addBulletSectionTask('experience', 'Work Experience');
+    addBulletSectionTask('projects', 'Projects');
+
+    const customSections = Array.isArray(resumeData.sections)
+      ? resumeData.sections.filter((section) => section?.isCustom && section.key)
+      : [];
+    customSections.forEach((section) => {
+      if (section.type === 'text') {
+        textSectionTasks.push({ key: section.key, title: section.title || section.key, original: typeof resumeData[section.key] === 'string' ? resumeData[section.key] : '' });
+      } else if (section.type === 'list') {
+        addBulletSectionTask(section.key, section.title);
+      } else if (section.type === 'bullets') {
+        addBulletSectionTask(section.key, section.title, true);
       }
     });
 
@@ -343,54 +554,53 @@ const magicTailor = async (req, res) => {
       experience: resumeData.experience || [],
       projects: resumeData.projects || [],
       skills: resumeData.skills || [],
-      education: resumeData.education || [],
-      certifications: resumeData.certifications || []
+      customSections: customSections.map((section) => ({
+        title: section.title || section.key, type: section.type, content: resumeData[section.key]
+      }))
     };
 
-    // A review only succeeds when EVERY selected section has been analyzed.
-    // Do not return a partial plan that could look complete to the user.
-    const sectionResults = await Promise.all(
-      sectionTasks.map((section) =>
-        optimizeArrayData(section.items, jobDescription, section.title, candidateContext)
-      )
-    );
+    const [bulletResults, textResults, skillsResult] = await Promise.all([
+      Promise.all(sectionTasks.map((section) => optimizeArrayData(section.items, jobDescription, section.title, candidateContext))),
+      Promise.all(textSectionTasks.map((section) => reviewTextSection({
+        sectionKey: section.key, sectionTitle: section.title, original: section.original, jd: jobDescription, candidateContext
+      }))),
+      reviewSkills(resumeData.skills || [], jobDescription, candidateContext)
+    ]);
 
     const bulletActions = [];
     let reviewedBulletCount = 0;
     let changedBulletCount = 0;
-    sectionResults.forEach((result, index) => {
+    bulletResults.forEach((result, index) => {
       const section = sectionTasks[index];
       reviewedBulletCount += result.reviewedCount;
       changedBulletCount += result.changedCount;
-      result.actions.forEach((entry) => {
-        bulletActions.push({
-          sectionKey: section.key,
-          sectionTitle: section.title,
-          itemIndex: entry.sectionIndex,
-          itemTitle: entry.itemTitle,
-          bullets: entry.bullets,
-          additions: entry.additions
-        });
-      });
+      result.actions.forEach((entry) => bulletActions.push({
+        sectionKey: section.key, sectionTitle: section.title, itemIndex: entry.sectionIndex,
+        itemTitle: entry.itemTitle, bullets: entry.bullets, additions: entry.additions
+      }));
     });
 
+    const sectionReviews = textResults;
+    const reviewedSkillCount = skillsResult.reviewedCount;
+    const reviewedPointCount = reviewedBulletCount + reviewedSkillCount + sectionReviews.length;
+    changedBulletCount += skillsResult.actions.filter((item) => item.action !== 'keep').length;
+    changedBulletCount += skillsResult.additions.length;
+    changedBulletCount += sectionReviews.filter((item) => item.action !== 'keep').length;
+
     return res.status(200).json({
-      success: true,
-      tailoredData: resumeData,
-      bulletActions,
-      changedBulletCount,
-      reviewedBulletCount,
-      atsScore: null
+      success: true, tailoredData: resumeData, sectionReviews, bulletActions,
+      skillActions: skillsResult.actions, skillAdditions: skillsResult.additions,
+      changedBulletCount, reviewedBulletCount, reviewedSkillCount,
+      reviewedTextSectionCount: sectionReviews.length, reviewedPointCount, atsScore: null
     });
   } catch (error) {
     console.error("JD tailoring failure:", error);
     return res.status(500).json({
       success: false,
-      error: "Resume review could not be completed. " + (error.message || "AI review failed.") + " No resume content was changed."
+      error: "The full resume review could not be completed. " + (error.message || "AI review failed.") + " No resume content was changed."
     });
   }
 };
-
 const optimizeBullet = async (req, res) => {
   const { bulletText, jobDescription } = req.body;
   if (!bulletText) return res.status(400).json({ success: false, error: "Insufficient text." });

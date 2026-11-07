@@ -385,6 +385,9 @@ export const useResumeStore = create((set, get) => ({
         throw new Error('The AI response did not include a complete bullet review.');
       }
 
+      if (!Array.isArray(data.sectionReviews) || !Array.isArray(data.skillActions)) {
+        throw new Error('The AI response did not include a complete section and skills review.');
+      }
       const tailoredItems = data.bulletActions.map((entry) => {
         if (!entry || !Array.isArray(entry.bullets) || !Number.isInteger(entry.itemIndex)) {
           throw new Error('The AI returned an incomplete section review. Run the Copilot again.');
@@ -402,19 +405,33 @@ export const useResumeStore = create((set, get) => ({
         };
       }).filter((entry) => entry.bullets.length || entry.additions.length);
 
-      const reviewedBulletCount = tailoredItems.reduce((total, item) => total + item.bullets.length, 0);
-      if (reviewedBulletCount !== Number(data.reviewedBulletCount || 0)) {
-        throw new Error('The AI review was incomplete: not every existing point received a decision.');
+      const sectionReviews = data.sectionReviews;
+      if (sectionReviews.some((item) => !item?.sectionKey || !['keep', 'modify', 'remove', 'add'].includes(item.action))) {
+        throw new Error('The AI returned an incomplete text-section review.');
       }
-      const changedBulletCount = tailoredItems.reduce((total, item) =>
-        total + item.bullets.filter((bullet) => bullet.action !== 'keep').length + item.additions.length, 0);
+      const skillActions = data.skillActions;
+      if (skillActions.some((item) => !['keep', 'modify', 'remove'].includes(item?.action))) {
+        throw new Error('The AI returned an incomplete skills review.');
+      }
+      const reviewedBulletCount = tailoredItems.reduce((total, item) => total + item.bullets.length, 0);
+      if (reviewedBulletCount !== Number(data.reviewedBulletCount || 0) ||
+          skillActions.length !== Number(data.reviewedSkillCount || 0) ||
+          sectionReviews.length !== Number(data.reviewedTextSectionCount || 0)) {
+        throw new Error('The AI review was incomplete: not every supported resume point received a decision.');
+      }
 
       set({
         generatedBullets: {
           success: true,
           tailoredItems,
-          changedBulletCount,
+          sectionReviews,
+          skillActions,
+          skillAdditions: Array.isArray(data.skillAdditions) ? data.skillAdditions : [],
+          changedBulletCount: Number(data.changedBulletCount || 0),
           reviewedBulletCount,
+          reviewedSkillCount: skillActions.length,
+          reviewedTextSectionCount: sectionReviews.length,
+          reviewedPointCount: Number(data.reviewedPointCount || 0),
           atsScore: null
         }
       });
@@ -473,6 +490,45 @@ export const useResumeStore = create((set, get) => ({
       updatedSkills.push({ id: uuidv4(), category: categoryName.trim(), items: [{ id: uuidv4(), name: normalizedName }] });
     }
     updateResumeData({ ...activeResume.resumeData, skills: updatedSkills });
+  },
+
+
+  applySkillReviewDecision: (categoryIndex, skillIndex, expectedName, action, replacement = '') => {
+    const { activeResume, updateResumeData } = get();
+    const skills = activeResume?.resumeData?.skills;
+    if (!Array.isArray(skills) || !Number.isInteger(categoryIndex) || !Number.isInteger(skillIndex)) return false;
+    if (!['modify', 'remove'].includes(action)) return false;
+
+    const nextSkills = [...skills];
+    const category = nextSkills[categoryIndex];
+    if (typeof category === 'string') {
+      if (skillIndex !== 0 || category.trim() !== String(expectedName || '').trim()) return false;
+      if (action === 'remove') {
+        nextSkills.splice(categoryIndex, 1);
+      } else {
+        if (!String(replacement || '').trim()) return false;
+        nextSkills[categoryIndex] = { category: 'General', items: [{ name: replacement.trim() }] };
+      }
+    } else {
+      if (!category || !Array.isArray(category.items)) return false;
+      const nextItems = [...category.items];
+      const current = nextItems[skillIndex];
+      const currentName = typeof current === 'string' ? current.trim() : String(current?.name || '').trim();
+      if (currentName !== String(expectedName || '').trim()) return false;
+      if (action === 'remove') {
+        nextItems.splice(skillIndex, 1);
+      } else {
+        if (!String(replacement || '').trim()) return false;
+        nextItems[skillIndex] = current && typeof current === 'object'
+          ? { ...current, name: replacement.trim() }
+          : replacement.trim();
+      }
+      if (nextItems.length === 0) nextSkills.splice(categoryIndex, 1);
+      else nextSkills[categoryIndex] = { ...category, items: nextItems };
+    }
+
+    updateResumeData({ ...activeResume.resumeData, skills: nextSkills });
+    return true;
   },
 
   removeSkillFromResume: (skillToRemove) => {

@@ -302,17 +302,24 @@ test('rejects incomplete decisions for skills rather than silently omitting a sk
     skills: [{ category: 'Backend', items: [{ name: 'Node.js' }, { name: 'MongoDB' }] }]
   }, async (_url, body) => {
     if (body.response_format.json_schema.name === 'resume_skills_review') {
-      return { data: { choices: [{ message: { content: JSON.stringify({
-        skills: [{ categoryIndex: 0, skillIndex: 0, action: 'keep', text: 'Node.js', reason: 'Relevant.' }],
-        additions: []
-      }) } }] }
-    };
+      return {
+        data: {
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                skills: [{ categoryIndex: 0, skillIndex: 0, action: 'keep', text: 'Node.js', reason: 'Relevant.' }],
+                additions: []
+              })
+            }
+          }]
+        }
+      };
+    }
     return mockBySchema(_url, body);
   });
   assert.equal(statusCode, 500);
   assert.match(payload.error, /missing, duplicate, or invalid skill decisions/i);
 });
-
 test('includes every plain-string custom bullet in the review', async () => {
   const { statusCode, payload } = await runReview({
     summary: '',

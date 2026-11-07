@@ -394,6 +394,105 @@ const reviewTextSection = async ({ sectionKey, sectionTitle, original, jd, candi
   };
 };
 
+
+const normalizeSkillsForReview = (skills) => (Array.isArray(skills) ? skills : []).map((category, categoryIndex) => {
+  if (typeof category === 'string') {
+    return { categoryIndex, category: 'General', items: [{ name: category.trim(), skillIndex: 0 }] };
+  }
+  const items = Array.isArray(category?.items) ? category.items : [];
+  return {
+    categoryIndex,
+    category: category?.category || 'Skills',
+    items: items.map((item, skillIndex) => ({
+      skillIndex,
+      name: typeof item === 'string' ? item.trim() : String(item?.name || '').trim()
+    })).filter((item) => item.name)
+  };
+});
+
+const reviewSkills = async (skills, jd, candidateContext) => {
+  const categories = normalizeSkillsForReview(skills);
+  const sourceSkills = categories.flatMap((category) => category.items.map((item) => ({
+    categoryIndex: category.categoryIndex,
+    skillIndex: item.skillIndex,
+    category: category.category,
+    name: item.name
+  })));
+  if (!sourceSkills.length) return { actions: [], additions: [], reviewedCount: 0 };
+
+  const systemInstruction = [
+    'You are a careful technical recruiter reviewing a resume skills section against a target job description.',
+    'Return exactly one KEEP, MODIFY, or REMOVE decision for every supplied skill.',
+    'KEEP skills that are relevant or show useful transferable capability. A skill is not irrelevant merely because it is not named word-for-word in the job description.',
+    'REMOVE only skills that are genuinely unrelated, misleading, obsolete in context, or redundant.',
+    'MODIFY only to correct an obvious spelling, naming, or standardization issue. Do not turn one skill into a different technology.',
+    'Suggest ADDITIONS only for skills explicitly evidenced in the supplied summary, work experience, projects, or custom resume content. The job description alone is never evidence that the candidate has a skill.',
+    'Never invent proficiency, depth, or hands-on experience. Do not transfer a skill to an employer/project attribution.',
+    'Return each categoryIndex/skillIndex exactly once. Return concise reasons and strict JSON only.'
+  ].join('\n');
+  const prompt = 'TARGET JOB DESCRIPTION:\n' + jd +
+    '\n\nEXISTING SKILLS (source of truth):\n' + JSON.stringify(categories) +
+    '\n\nINCLUDED RESUME EVIDENCE FOR VERIFYING SKILL ADDITIONS:\n' + JSON.stringify(candidateContext);
+  const raw = await callAIEngineWithRetry(prompt, systemInstruction, {
+    maxTokens: 2200,
+    temperature: 0.2,
+    jsonSchema: SKILLS_REVIEW_SCHEMA,
+    schemaName: 'resume_skills_review'
+  });
+  const parsed = extractCleanJSON(raw);
+  if (!Array.isArray(parsed.skills) || !Array.isArray(parsed.additions)) {
+    throw new Error('AI returned an incomplete Skills section review.');
+  }
+
+  const returnedKeys = parsed.skills.map((item) => Number(item.categoryIndex) + ':' + Number(item.skillIndex));
+  const expectedKeys = sourceSkills.map((item) => item.categoryIndex + ':' + item.skillIndex);
+  if (
+    parsed.skills.length !== sourceSkills.length ||
+    returnedKeys.some((key) => !expectedKeys.includes(key)) ||
+    new Set(returnedKeys).size !== expectedKeys.length
+  ) {
+    throw new Error('AI returned missing, duplicate, or invalid skill decisions.');
+  }
+
+  const actions = parsed.skills.map((decision) => {
+    const source = sourceSkills.find((item) =>
+      item.categoryIndex === Number(decision.categoryIndex) && item.skillIndex === Number(decision.skillIndex)
+    );
+    if (!source || !['keep', 'modify', 'remove'].includes(decision.action)) {
+      throw new Error('AI returned an invalid action for skill ' + (source?.name || 'item') + '.');
+    }
+    const suggestedText = String(decision.text || '').trim();
+    if (decision.action === 'modify' && (!suggestedText || suggestedText.toLowerCase() === source.name.toLowerCase())) {
+      return { ...source, action: 'keep', original: source.name, text: source.name, reason: 'No meaningful correction was needed.' };
+    }
+    return {
+      ...source,
+      action: decision.action,
+      original: source.name,
+      text: decision.action === 'modify' ? suggestedText : source.name,
+      reason: String(decision.reason || '').slice(0, 220)
+    };
+  });
+
+  const seenAdditions = new Set();
+  const additions = parsed.additions
+    .filter((item) => typeof item?.name === 'string' && item.name.trim() && typeof item?.category === 'string' && item.category.trim())
+    .filter((item) => {
+      const key = item.name.trim().toLowerCase();
+      if (seenAdditions.has(key) || sourceSkills.some((skill) => skill.name.toLowerCase() === key)) return false;
+      seenAdditions.add(key);
+      return true;
+    })
+    .slice(0, 5)
+    .map((item) => ({
+      category: item.category.trim(),
+      name: item.name.trim(),
+      reason: String(item.reason || '').slice(0, 220)
+    }));
+
+  return { actions, additions, reviewedCount: actions.length };
+};
+
 const optimizeArrayData = async (items, jd, sectionName, candidateContext = {}) => {
   try {
     return await optimizeArrayDataOnce(items, jd, sectionName, candidateContext);

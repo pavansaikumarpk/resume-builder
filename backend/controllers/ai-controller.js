@@ -180,6 +180,60 @@ const BULLET_REVIEW_RESPONSE_SCHEMA = {
   additionalProperties: false
 };
 
+const TEXT_SECTION_REVIEW_SCHEMA = {
+  type: 'object',
+  properties: {
+    review: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['keep', 'modify', 'remove', 'add'] },
+        text: { type: 'string' },
+        reason: { type: 'string' }
+      },
+      required: ['action', 'text', 'reason'],
+      additionalProperties: false
+    }
+  },
+  required: ['review'],
+  additionalProperties: false
+};
+
+const SKILLS_REVIEW_SCHEMA = {
+  type: 'object',
+  properties: {
+    skills: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          categoryIndex: { type: 'integer', minimum: 0 },
+          skillIndex: { type: 'integer', minimum: 0 },
+          action: { type: 'string', enum: ['keep', 'modify', 'remove'] },
+          text: { type: 'string' },
+          reason: { type: 'string' }
+        },
+        required: ['categoryIndex', 'skillIndex', 'action', 'text', 'reason'],
+        additionalProperties: false
+      }
+    },
+    additions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          category: { type: 'string' },
+          name: { type: 'string' },
+          reason: { type: 'string' }
+        },
+        required: ['category', 'name', 'reason'],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ['skills', 'additions'],
+  additionalProperties: false
+};
+
 const optimizeArrayDataOnce = async (items, jd, sectionName, candidateContext = {}, retryFeedback = '') => {
   if (!Array.isArray(items) || !items.length) return { items: items || [], actions: [], changedCount: 0, reviewedCount: 0 };
 
